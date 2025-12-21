@@ -1,0 +1,29 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  rag-agent:
+    build:
+      context: ./rag-agent
+    container_name: rag-agent
+    depends_on:
+      - qdrant
+    environment:
+      # Everything here is correct and points to the qdrant service name
+      QDRANT_HOST: "${QDRANT_HOST}"
+      QDRANT_PORT: "${QDRANT_PORT}"
+      QDRANT_URL: "http://${QDRANT_HOST}:${QDRANT_PORT}"
+
+      # Subtle: app loads this at runtime (not a Compose env override)
+      APP_CONFIG_PATH: "/app/config/environment.yml"
+
+    command: ["sh", "-lc", "python app.py || true; sleep infinity"]
+
+volumes:
+  qdrant_data:
