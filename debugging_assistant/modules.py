@@ -87,28 +87,68 @@ evidence_digest = dspy.Predict(EvidenceDigest)
 
 
 class ShouldStopDebugging(dspy.Signature):
-    evidence: str = dspy.InputField(
-        desc="All evidence gathered so far including initial problem, executed probes, and findings."
-    )
-    hypotheses: str = dspy.InputField(
-        desc="Current hypotheses about the problem."
-    )
-    steps_used: int = dspy.InputField(
-        desc="Number of debug steps used so far."
-    )
-    steps_remaining: int = dspy.InputField(
-        desc="Number of debug steps remaining."
-    )
-    
+    evidence: str = dspy.InputField(desc="All evidence gathered so far including initial problem, executed probes, and findings.")
+    hypotheses: str = dspy.InputField(desc="Current hypotheses about the problem.")
+    steps_used: int = dspy.InputField(desc="Number of debug steps used so far.")
+    steps_remaining: int = dspy.InputField(desc="Number of debug steps remaining.")
+
     should_stop: str = dspy.OutputField(
-        desc="Decision: 'yes' if root cause identified and ready to propose fix, 'no' if more investigation needed. Only stop when confident about the diagnosis."
+        desc=(
+            "Decision: 'yes' ONLY if the root cause is proven by evidence (not inferred) "
+            "and no critical uncertainty remains. Otherwise 'no'."
+        )
     )
-    reasoning: str = dspy.OutputField(
-        desc="Brief explanation of the stopping decision (2-3 sentences)."
+    confidence: str = dspy.OutputField(
+        desc="high/medium/low with brief justification grounded in evidence."
     )
+    missing_evidence: str = dspy.OutputField(
+        desc=(
+            "If should_stop='no': list the 1-3 most important missing evidence items "
+            "needed to reach high confidence. If should_stop='yes': 'none'."
+        )
+    )
+    evidence_quotes: str = dspy.OutputField(
+        desc=(
+            "3-6 short evidence excerpts supporting the decision. Each bullet starts with a step/probe reference "
+            "and must be <= 25 words."
+        )
+    )
+    reasoning: str = dspy.OutputField(desc="2-3 sentences explaining the decision, strictly evidence-based.")
 
 
-stop_decider = dspy.Predict(ShouldStopDebugging)
+class ShouldStopDebuggingModule(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.predict = dspy.Predict(ShouldStopDebugging)
+
+    def forward(self, evidence, hypotheses, steps_used, steps_remaining):
+        return self.predict(
+            evidence=evidence,
+            hypotheses=hypotheses,
+            steps_used=steps_used,
+            steps_remaining=steps_remaining,
+            instructions="""
+You are acting as a senior production SRE deciding whether debugging can stop.
+
+Grounding rules:
+- Base your decision strictly on the provided evidence.
+- Do NOT assume the contents of files or runtime behavior unless directly observed.
+- If the top hypothesis mentions a specific artifact (e.g., /app/config/environment.yml, Dockerfile ENV, config loader),
+  you must have direct evidence from that artifact (e.g., file content, inspect output, code snippet) before stopping.
+
+Stop criteria (should_stop='yes') require ALL of:
+1) Root cause is proven (direct evidence, not inference).
+2) The failure path is explained end-to-end (why this causes the observed error).
+3) A fix can be proposed without guessing (no critical missing evidence).
+
+If steps_remaining is small, prioritize the single most discriminating missing piece of evidence.
+Output format rules:
+- should_stop must be exactly 'yes' or 'no'
+- If should_stop='yes', missing_evidence must be 'none'
+"""
+        )
+
+stop_decider = ShouldStopDebuggingModule()
 
 
 class FinalDiagnosis(dspy.Signature):
@@ -136,4 +176,28 @@ class FinalDiagnosis(dspy.Signature):
     )
 
 
-final_diagnosis = dspy.Predict(FinalDiagnosis)
+class FinalDiagnosisModule(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.predict = dspy.Predict(FinalDiagnosis)
+
+    def forward(self, initial_problem, evidence, probes_summary):
+        return self.predict(
+            initial_problem=initial_problem,
+            evidence=evidence,
+            probes_summary=probes_summary,
+            instructions="""
+You are acting as a senior production SRE.
+
+General rules:
+- Base conclusions strictly on provided evidence.
+- If evidence is insufficient, explicitly say so.
+- Avoid speculation and generic explanations.
+- Be precise and technical.
+- Do not repeat the input verbatim.
+"""
+        )
+
+
+
+final_diagnosis = FinalDiagnosisModule()

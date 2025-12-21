@@ -10,7 +10,7 @@ import os
 def setup_dspy_llm(api_key: str):
     """Configure DSPy with your LLM of choice."""
     # For demo purposes, using OpenAI
-    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key)
+    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=False)
     dspy.configure(lm=lm)
 
 
@@ -25,7 +25,7 @@ if __name__ == "__main__":
 
     # Define the initial problem/evidence
     initial_evidence = """
-Hello there ! I have a Problem: My rag-agent is failing to connect to my vectordb container.
+Hi I have a Problem: My rag-agent is failing to connect to my vectordb container.
 
 I have no error details.
 
