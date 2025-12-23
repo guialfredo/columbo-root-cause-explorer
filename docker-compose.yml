@@ -10,7 +10,7 @@ services:
 
   rag-agent:
     build:
-      context: ./rag-agent
+      context: ./rag_agent
     container_name: rag-agent
     depends_on:
       - qdrant

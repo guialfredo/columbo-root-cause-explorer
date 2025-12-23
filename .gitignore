@@ -55,6 +55,9 @@ htmlcov/
 # Logs
 *.log
 
+# Debug sessions
+debug_sessions/
+
 # Poetry
 poetry.lock
 

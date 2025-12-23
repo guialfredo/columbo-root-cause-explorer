@@ -1,8 +1,29 @@
 import json
 import docker
-from debugging_assistant.modules import hypothesis_gen, probe_planner, evidence_digest, stop_decider, final_diagnosis
-from debugging_assistant.probes import probe_registry, PROBE_DEPENDENCIES
+from datetime import datetime
+from typing import Optional
+from debugging_assistant.modules import (
+    hypothesis_gen, 
+    probe_planner, 
+    evidence_digest, 
+    stop_decider, 
+    final_diagnosis,
+    EvidenceInput,
+    ProbePlanningInput,
+    EvidenceDigestInput,
+)
+from debugging_assistant.probes import probe_registry, PROBE_DEPENDENCIES, build_tools_spec, validate_probe_args, PROBE_SCHEMAS
+from debugging_assistant.schemas import (
+    DebugSession,
+    ProbeCall,
+    Finding,
+    Hypothesis,
+    ConfidenceLevel,
+    Severity,
+)
 from pathlib import Path
+import uuid
+from typing import Dict, Any, Optional, List
 
 
 class ContainerCache:
@@ -69,7 +90,7 @@ def resolve_probe_dependencies(
     probe_name: str,
     args: dict,
     probe_results_cache: dict,
-    workspace_root: str
+    workspace_root: Optional[str]
 ) -> dict:
     """Resolve dependencies for a probe using declarative configuration.
     
@@ -128,7 +149,7 @@ def execute_probe(
     probe_args_str: str, 
     container_cache: ContainerCache,
     probe_results_cache: dict,
-    workspace_root: str = None
+    workspace_root: Optional[str] = None
 ) -> dict:
     """Execute a probe by looking it up in the probe registry.
     
@@ -157,6 +178,15 @@ def execute_probe(
     
     # Resolve dependencies using declarative configuration
     args = resolve_probe_dependencies(probe_name, args, probe_results_cache, workspace_root)
+    
+    # Validate required arguments are present
+    is_valid, error_msg = validate_probe_args(probe_name, args)
+    if not is_valid:
+        return {
+            "error": error_msg,
+            "probe_name": probe_name,
+            "provided_args": list(args.keys()),
+        }
     
     try:
         # Handle different probe types
@@ -285,7 +315,7 @@ def format_probe_result(result) -> str:
         return str(result)
 
 
-def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str = None):
+def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optional[str] = None):
     """Main debugging loop that iterates through hypothesis generation,
     probe planning, execution, and evidence digestion.
     
@@ -303,14 +333,22 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
     if workspace_root is None:
         workspace_root = str(Path.cwd())
     
-    # Start with just the initial evidence - no automatic container discovery
+    # Initialize structured session
+    session = DebugSession(
+        session_id=str(uuid.uuid4())[:8],
+        initial_problem=initial_evidence,
+        workspace_root=workspace_root,
+        max_steps=max_steps,
+        current_step=0
+    )
+    
+    # Legacy compatibility - keep these for now
     evidence = initial_evidence
     evidence_log = []  # Keep detailed log of all findings
-    probes_executed = []
     probe_results_cache = {}  # Store structured probe results for inter-probe dependencies
-    executed_probe_signatures = set()  # Track probe+args to prevent repetition
     
     print(f"Starting debug loop (max {max_steps} steps)...")
+    print(f"Session ID: {session.session_id}")
     print(f"Workspace: {workspace_root}\n")
     
     for step in range(max_steps):
@@ -321,28 +359,39 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
         try:
             # Generate hypotheses
             print("\nGenerating hypotheses...")
-            hypotheses_result = hypothesis_gen(evidence=evidence)
-            hypotheses = hypotheses_result.hypotheses
-            key_unknowns = getattr(hypotheses_result, 'key_unknowns', 'N/A')
+            evidence_input = EvidenceInput(evidence=evidence)
+            hypotheses_result = hypothesis_gen(evidence_input=evidence_input)
+            hypotheses = hypotheses_result.hypotheses_output.hypotheses
+            key_unknowns = hypotheses_result.hypotheses_output.key_unknowns
             
             print(f"\nHypotheses:\n{hypotheses}")
             print(f"\nKey unknowns:\n{key_unknowns}")
             
             # Plan next probe
             print("\nPlanning next probe...")
-            probe_plan_result = probe_planner(
+            tools_spec = build_tools_spec()
+            planning_input = ProbePlanningInput(
                 evidence=evidence,
-                hypotheses=hypotheses
+                hypotheses=hypotheses,
+                tools_spec=tools_spec
             )
+            probe_plan_result = probe_planner(planning_input=planning_input)
             
-            probe_name = probe_plan_result.probe_name
-            probe_args = probe_plan_result.probe_args
-            expected_signal = probe_plan_result.expected_signal
-            stop_condition = probe_plan_result.stop_if
+            probe_name = probe_plan_result.probe_plan.probe_name
+            probe_args = probe_plan_result.probe_plan.probe_args
+            expected_signal = probe_plan_result.probe_plan.expected_signal
+            stop_condition = probe_plan_result.probe_plan.stop_if
             
             # Check if this exact probe+args combination has been executed before
-            probe_signature = f"{probe_name}:{probe_args}"
-            if probe_signature in executed_probe_signatures:
+            # Create temporary ProbeCall to compute signature
+            temp_probe = ProbeCall(
+                step=step + 1,
+                probe_name=probe_name,
+                probe_args=parse_probe_args(probe_args)
+            )
+            probe_signature = temp_probe.compute_signature()
+            
+            if probe_signature in session.get_executed_probe_signatures():
                 print(f"\n⚠ WARNING: This exact probe has already been executed!")
                 print(f"   Probe: {probe_name}")
                 print(f"   Args: {probe_args}")
@@ -351,15 +400,14 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
                 evidence_log.append(f"[Step {step + 1}] Agent attempted to repeat {probe_name} with same args - skipped")
                 continue
             
-            # Mark this probe+args as executed
-            executed_probe_signatures.add(probe_signature)
-            
             print(f"\nProbe: {probe_name}")
             print(f"Args: {probe_args}")
             print(f"Expected signal: {expected_signal}")
             
             # Execute probe
             print(f"\nExecuting probe '{probe_name}'...")
+            probe_start = datetime.utcnow()
+            
             raw_probe_result = execute_probe(
                 probe_name=probe_name,
                 probe_args_str=probe_args,
@@ -368,27 +416,46 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
                 workspace_root=workspace_root
             )
             
+            probe_end = datetime.utcnow()
+            
             # Store result in cache for future probes to reference
             probe_results_cache[probe_name] = raw_probe_result
             
+            # Normalize result: wrap lists in dict for consistency
+            normalized_result = raw_probe_result
+            if isinstance(raw_probe_result, list):
+                normalized_result = {"items": raw_probe_result}
+            
+            # Create structured ProbeCall
+            probe_call = ProbeCall(
+                step=step + 1,
+                probe_name=probe_name,
+                probe_args=parse_probe_args(probe_args),
+                started_at=probe_start,
+                finished_at=probe_end,
+                result=normalized_result,
+                error=str(normalized_result.get("error")) if isinstance(normalized_result, dict) and normalized_result.get("error") else None,
+            )
+            probe_call.signature = probe_call.compute_signature()
+            
+            # Add to session
+            session.probe_history.append(probe_call)
+            session.current_step = step + 1
+            
             probe_result_str = format_probe_result(raw_probe_result)
             print(f"\nProbe result:\n{probe_result_str[:500]}...")
-            
-            probes_executed.append({
-                "step": step + 1,
-                "probe_name": probe_name,
-                "probe_args": probe_args,
-                "result": raw_probe_result,
-            })
+            if probe_call.duration_seconds:
+                print(f"Execution time: {probe_call.duration_seconds:.2f}s")
             
             # Digest evidence - create a compact summary of this probe's findings
             print("\nDigesting evidence...")
             prior_evidence_text = "\n".join(evidence_log)
-            evidence_digest_result = evidence_digest(
+            digest_input = EvidenceDigestInput(
                 raw_probe_result=probe_result_str,
                 prior_evidence_digest=prior_evidence_text
             )
-            new_finding = evidence_digest_result.updated_evidence_digest
+            evidence_digest_result = evidence_digest(digest_input=digest_input)
+            new_finding = evidence_digest_result.digest_output.updated_evidence_digest
             
             # Extract just the NEW information (not the full cumulative digest)
             # by looking at what was added beyond the prior evidence
@@ -410,8 +477,8 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
             
             # Build list of previously executed probes for LLM visibility
             executed_list = []
-            for i, exec_probe in enumerate(probes_executed, 1):
-                executed_list.append(f"{i}. {exec_probe['probe_name']} - {exec_probe['probe_args']}")
+            for i, exec_probe in enumerate(session.probe_history, 1):
+                executed_list.append(f"{i}. {exec_probe.probe_name} - {exec_probe.probe_args}")
             
             probes_summary = "\n".join(executed_list) if executed_list else "None yet"
             
@@ -433,20 +500,25 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
             
             # Agent-driven stopping decision
             print(f"\nEvaluating whether to stop debugging...")
-            stop_decision = stop_decider(
+            stop_result = stop_decider(
                 evidence=evidence,
                 hypotheses=hypotheses,
                 steps_used=steps_used,
                 steps_remaining=steps_remaining
             )
             
-            should_stop = stop_decision.should_stop.strip().lower()
-            reasoning = stop_decision.reasoning
+            # Access structured output directly
+            stop_decision = stop_result.stop_decision
+            should_stop = stop_decision.should_stop == "yes"
             
-            print(f"Stop decision: {should_stop}")
-            print(f"Reasoning: {reasoning}")
+            session.should_stop = should_stop
+            session.stop_reason = stop_decision.reasoning
             
-            if should_stop == "yes":
+            print(f"Stop decision: {stop_decision.should_stop}")
+            print(f"Confidence: {stop_decision.confidence}")
+            print(f"Reasoning: {stop_decision.reasoning}")
+            
+            if should_stop:
                 print("\n✓ Agent decided to stop debugging!")
                 break
             
@@ -466,15 +538,16 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
     # Generate final diagnosis and recommendations
     print("\n\nGenerating final diagnosis...")
     probes_summary = "\n".join([
-        f"{i}. {p['probe_name']} - {p['probe_args']}" 
-        for i, p in enumerate(probes_executed, 1)
+        f"{i}. {p.probe_name} - {p.probe_args}" 
+        for i, p in enumerate(session.probe_history, 1)
     ])
     
-    diagnosis = final_diagnosis(
+    diagnosis_result = final_diagnosis(
         initial_problem=initial_evidence,
         evidence=evidence,
         probes_summary=probes_summary
     )
+    diagnosis = diagnosis_result.diagnosis_result
     
     # Print formatted diagnosis
     print("\n" + "="*60)
@@ -487,6 +560,9 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
         print(f"\nAdditional Notes:\n{diagnosis.additional_notes}")
     print("\n" + "="*60)
     
+    # Mark session as finished
+    session.finished_at = datetime.utcnow()
+    
     return {
         "diagnosis": {
             "root_cause": diagnosis.root_cause,
@@ -495,10 +571,14 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: str =
             "additional_notes": diagnosis.additional_notes,
         },
         "debug_session": {
+            "session_id": session.session_id,
             "initial_problem": initial_evidence,
-            "total_steps": len(probes_executed),
-            "probes_executed": probes_executed,
+            "total_steps": session.current_step,
+            "probes_executed": [p.model_dump() for p in session.probe_history],
             "evidence_log": evidence_log,
             "final_evidence": evidence,
-        }
+            "started_at": session.started_at.isoformat(),
+            "finished_at": session.finished_at.isoformat() if session.finished_at else None,
+        },
+        "session_model": session,  # Include the full Pydantic model for advanced use
     }

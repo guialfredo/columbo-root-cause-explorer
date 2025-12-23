@@ -2,6 +2,11 @@
 
 import dspy
 from debugging_assistant.debug_loop import debug_loop
+from debugging_assistant.session_utils import (
+    save_session_to_file, 
+    generate_session_report,
+    analyze_probe_performance
+)
 from pathlib import Path
 from dotenv import load_dotenv
 import os
@@ -10,7 +15,7 @@ import os
 def setup_dspy_llm(api_key: str):
     """Configure DSPy with your LLM of choice."""
     # For demo purposes, using OpenAI
-    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=False)
+    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=True)
     dspy.configure(lm=lm)
 
 
@@ -55,8 +60,10 @@ Context:
     # Access the new structured result format
     diagnosis = result["diagnosis"]
     debug_session = result["debug_session"]
+    session_model = result["session_model"]  # The full Pydantic model
     
     print(f"\nTotal probing steps: {debug_session['total_steps']}")
+    print(f"Session ID: {session_model.session_id}")
     
     print("\n" + "=" * 70)
     print("DIAGNOSIS SUMMARY")
@@ -79,3 +86,29 @@ Context:
     for probe in debug_session["probes_executed"]:
         print(f"\nStep {probe['step']}: {probe['probe_name']}")
         print(f"  Args: {probe['probe_args']}")
+    
+    # NEW: Use the structured session model for advanced features
+    print("\n" + "=" * 70)
+    print("SESSION ANALYTICS (Using Pydantic Models)")
+    print("=" * 70)
+    
+    # Performance analysis
+    perf = analyze_probe_performance(session_model)
+    print(f"\nProbe Performance:")
+    print(f"  Total execution time: {perf.get('total_time', 0):.2f}s")
+    print(f"  Average per probe: {perf.get('avg_time_per_probe', 0):.2f}s")
+    print(f"  Success rate: {perf.get('success_rate', 0):.1%}")
+    
+    # Save session to file
+    print("\n" + "-" * 70)
+    output_dir = Path(workspace_root) / "debug_sessions"
+    output_dir.mkdir(exist_ok=True)
+    
+    session_file = save_session_to_file(session_model, str(output_dir))
+    print(f"Session data saved to: {session_file}")
+    
+    # Generate and save markdown report
+    report = generate_session_report(session_model)
+    report_file = output_dir / f"report_{session_model.session_id}.md"
+    report_file.write_text(report)
+    print(f"Session report saved to: {report_file}")
