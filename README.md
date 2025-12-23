@@ -1,10 +1,16 @@
-# Columbo : Root Cause Explorer in Containerized Architectures
+<div align="center">
 
-A root cause exploration engine for containerized systems, designed to help engineers investigate failures through hypothesis-driven reasoning and deterministic probes.
+# 🕵️ Columbo: Root Cause Explorer in Containerized Architectures
+
+> *"Just one more thing..."* — Your AI debugging partner for containerized systems
+
+</div>
+
+An intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
 
 ## Overview
 
-This project implements an intelligent root cause explorer that systematically investigates issues in local containerized environments. Instead of ad-hoc manual inspection, the agent guides a structured investigation by:
+Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, it guides a structured investigation by:
 
 1. **Generating hypotheses** about potential root causes based on available evidence
 2. **Planning and executing diagnostic probes** to gather targeted evidence
