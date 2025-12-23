@@ -1,16 +1,16 @@
-# Debugging Assistant Agent
+# Columbo : Root Cause Explorer in Containerized Architectures
 
-An autonomous multi-turn AI agent that explores bugs in containerized architectures to identify root causes through hypothesis-driven investigation.
+A root cause exploration engine for containerized systems, designed to help engineers investigate failures through hypothesis-driven reasoning and deterministic probes.
 
 ## Overview
 
-This project implements an intelligent debugging assistant that systematically investigates issues in local containerized environments. Rather than requiring manual inspection, the agent autonomously:
+This project implements an intelligent root cause explorer that systematically investigates issues in local containerized environments. Instead of ad-hoc manual inspection, the agent guides a structured investigation by:
 
-1. **Generates hypotheses** about potential root causes based on available evidence
-2. **Plans and executes diagnostic probes** to gather targeted evidence
-3. **Digests findings** and updates its understanding iteratively
-4. **Decides when to stop** based on confidence levels and evidence quality
-5. **Produces comprehensive diagnoses** with root causes and recommended fixes
+1. **Generating hypotheses** about potential root causes based on available evidence
+2. **Planning and executing diagnostic probes** to gather targeted evidence
+3. **Digesting findings** and updating its understanding iteratively
+4. **Deciding when to stop** based on evidence quality and explicit confidence criteria
+5. **Producing comprehensive diagnoses** with root causes and recommended fixes
 
 The agent operates entirely through structured probes—deterministic inspection tools that examine container states, logs, configurations, network connectivity, and more.
 
