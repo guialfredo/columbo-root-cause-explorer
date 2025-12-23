@@ -2,7 +2,7 @@
 
 # 🕵️ Columbo: Root Cause Explorer in Containerized Architectures
 
-> *"Just one more thing..."* — Your AI debugging partner for containerized systems
+> *"Just one more thing..."* — Your investigation partner for containerized systems.
 
 </div>
 
