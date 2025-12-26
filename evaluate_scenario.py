@@ -44,41 +44,24 @@ def setup_dspy_llm(api_key: str):
 
 def evaluate_diagnosis(
     diagnosis: dict,
-    expected_root_cause: dict,
+    optimal_steps: int,
     session_model,
 ) -> dict:
-    """Evaluate how well the diagnosis matches the expected root cause.
+    """Evaluate the debugging session performance.
     
     Returns:
         dict with evaluation metrics
     """
-    root_cause_text = diagnosis["root_cause"].lower()
-    expected_keywords = expected_root_cause.get("keywords", [])
-    expected_summary = expected_root_cause.get("summary", "").lower()
+    steps_used = session_model.current_step
     
-    # Check keyword matches
-    keywords_found = [kw for kw in expected_keywords if kw.lower() in root_cause_text]
-    keyword_score = len(keywords_found) / len(expected_keywords) if expected_keywords else 0
-    
-    # Check if summary concepts are mentioned
-    summary_words = expected_summary.split()
-    summary_matches = sum(1 for word in summary_words if len(word) > 3 and word in root_cause_text)
-    summary_score = summary_matches / len(summary_words) if summary_words else 0
-    
-    # Check if location is mentioned
-    expected_location = expected_root_cause.get("location", "")
-    location_mentioned = expected_location.lower() in root_cause_text if expected_location else False
-    
-    # Overall score
-    overall_score = (keyword_score * 0.5 + summary_score * 0.3 + (1.0 if location_mentioned else 0.0) * 0.2)
+    # Simple efficiency score: optimal steps / actual steps
+    # Capped at 1.0 for overperformance
+    efficiency_score = min(1.0, optimal_steps / steps_used) if steps_used > 0 else 0
     
     return {
-        "overall_score": overall_score,
-        "keyword_score": keyword_score,
-        "keywords_found": keywords_found,
-        "summary_score": summary_score,
-        "location_mentioned": location_mentioned,
-        "steps_used": session_model.current_step,
+        "steps_used": steps_used,
+        "optimal_steps": optimal_steps,
+        "efficiency_score": efficiency_score,
         "confidence": diagnosis["confidence"],
     }
 
@@ -142,7 +125,8 @@ def main():
     
     print(f"✓ Loaded: {manifest.title}")
     print(f"  Difficulty: {manifest.difficulty}")
-    print(f"  Max steps: {manifest.max_debug_steps}")
+    print(f"  Max steps: {manifest.budgets['max_steps']}")
+    print(f"  Optimal steps: {manifest.budgets['optimal_steps']}")
     
     # Check for conflicts before spinning up
     if not args.no_spin_up:
@@ -151,17 +135,14 @@ def main():
         print("=" * 70)
         
         conflicts_resolved = check_and_resolve_conflicts(
-            manifest,
+            args.scenario_id,
             auto_cleanup=args.cleanup,
             force=False
         )
         
         if not conflicts_resolved:
             print("\n💡 Tip: Run with --cleanup to automatically resolve conflicts")
-      
-    print(f"✓ Loaded: {manifest.title}")
-    print(f"  Difficulty: {manifest.difficulty}")
-    print(f"  Max steps: {manifest.max_debug_steps}")
+            return 1
     
     # Spin up scenario
     compose_spec = None
@@ -190,19 +171,18 @@ def main():
     initial_evidence = manifest.initial_evidence
     if not initial_evidence:
         print("WARNING: No initial_evidence in manifest, using default")
-        initial_evidence = f"Problem: {manifest.description}"
+        initial_evidence = f"Problem: Service failure in {manifest.title}"
     
     print(f"\nInitial Evidence:\n{initial_evidence}\n")
     
     try:
         result = debug_loop(
             initial_evidence=initial_evidence,
-            max_steps=manifest.max_debug_steps,
+            max_steps=manifest.budgets['max_steps'],
             workspace_root=str(scenario_ref.scenario_dir),
         )
         
         diagnosis = result["diagnosis"]
-        debug_session = result["debug_session"]
         session_model = result["session_model"]
         
     except Exception as e:
@@ -219,18 +199,13 @@ def main():
     
     evaluation = evaluate_diagnosis(
         diagnosis=diagnosis,
-        expected_root_cause=manifest.expected_root_cause,
+        optimal_steps=manifest.budgets['optimal_steps'],
         session_model=session_model,
     )
     
-    print(f"\n📊 Overall Score: {evaluation['overall_score']:.2%}")
-    print(f"   Keyword Score: {evaluation['keyword_score']:.2%}")
-    print(f"   Summary Score: {evaluation['summary_score']:.2%}")
-    print(f"   Location Mentioned: {'✓' if evaluation['location_mentioned'] else '✗'}")
-    print(f"   Steps Used: {evaluation['steps_used']}/{manifest.max_debug_steps}")
+    print(f"\n📊 Efficiency Score: {evaluation['efficiency_score']:.2%}")
+    print(f"   Steps Used: {evaluation['steps_used']} (optimal: {evaluation['optimal_steps']})")
     print(f"   Confidence: {evaluation['confidence']}")
-    
-    print(f"\n🔍 Keywords Found: {', '.join(evaluation['keywords_found'])}")
     
     print(f"\n{'=' * 70}")
     print("DIAGNOSIS")
@@ -241,9 +216,7 @@ def main():
     print(f"\n{'=' * 70}")
     print("EXPECTED ROOT CAUSE")
     print("=" * 70)
-    print(f"\nID: {manifest.expected_root_cause.get('id')}")
-    print(f"Summary: {manifest.expected_root_cause.get('summary')}")
-    print(f"Location: {manifest.expected_root_cause.get('location')}")
+    print(f"\nID: {manifest.grading['expected_root_cause_id']}")
     
     # Save results
     args.output_dir.mkdir(exist_ok=True)
@@ -265,11 +238,11 @@ def main():
     eval_file = args.output_dir / f"evaluation_{session_model.session_id}.json"
     eval_data = {
         "scenario_id": manifest.scenario_id,
-        "scenario_name": manifest.name,
+        "scenario_title": manifest.title,
         "session_id": session_model.session_id,
         "evaluation": evaluation,
         "diagnosis": diagnosis,
-        "expected_root_cause": manifest.expected_root_cause,
+        "expected_root_cause_id": manifest.grading['expected_root_cause_id'],
         "timestamp": session_model.started_at.isoformat(),
     }
     eval_file.write_text(json.dumps(eval_data, indent=2, default=str))
@@ -292,12 +265,12 @@ def main():
     print("EVALUATION COMPLETE")
     print("=" * 70)
     
-    if evaluation['overall_score'] >= 0.7:
-        print("\n✅ PASS: Debugging assistant successfully identified the root cause!")
-    elif evaluation['overall_score'] >= 0.4:
-        print("\n⚠️  PARTIAL: Debugging assistant partially identified the issue")
+    if evaluation['efficiency_score'] >= 0.8:
+        print("\n✅ EXCELLENT: Debugging completed efficiently!")
+    elif evaluation['efficiency_score'] >= 0.5:
+        print("\n⚠️  ACCEPTABLE: Debugging completed but used more steps than optimal")
     else:
-        print("\n❌ FAIL: Debugging assistant did not identify the root cause")
+        print("\n❌ NEEDS IMPROVEMENT: Debugging took significantly more steps than expected")
     
     return 0
 

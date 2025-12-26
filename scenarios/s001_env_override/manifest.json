@@ -1,48 +1,18 @@
 {
   "scenario_id": "S001",
-  "name": "env_override",
   "title": "Environment Variable Override via Runtime Config",
-  "description": "RAG agent fails to connect to Qdrant because a runtime YAML config file overrides environment variables with localhost instead of the Docker service name",
-  "difficulty": "easy-medium",
+  "difficulty": "medium",
   "category": "configuration",
-  "tags": ["docker", "networking", "config-override", "environment-variables", "qdrant"],
-  "services": {
-    "qdrant": {
-      "image": "qdrant/qdrant:latest",
-      "container_name": "s001_qdrant",
-      "expected_status": "healthy",
-      "ports": ["6333"]
-    },
-    "rag_agent": {
-      "build": true,
-      "container_name": "s001_rag_agent",
-      "expected_status": "failing",
-      "depends_on": ["qdrant"]
-    }
+  "grading": {
+    "expected_root_cause_id": "ENV_OVERRIDE_RUNTIME_CONFIG",
+    "proof_requirements": [
+      { "type": "file_value", "path": "config/environment.yml", "contains": "localhost" },
+      { "type": "runtime_connection", "service": "rag_agent", "host": "localhost", "port": 6333 }
+    ]
   },
-  "expected_root_cause": {
-    "id": "ENV_OVERRIDE_DOTENV",
-    "summary": "Runtime configuration file overrides correct environment variables with localhost",
-    "location": "config/environment.yml",
-    "type": "configuration",
-    "keywords": ["override", "localhost", "environment.yml", "config", "precedence"]
+  "budgets": {
+    "max_steps": 8,
+    "optimal_steps": 4
   },
-  "debugging_hints": [
-    "Check which host the application is trying to connect to",
-    "Examine environment variables in the container",
-    "Look for configuration files being loaded at runtime",
-    "Compare environment variables with actual connection attempts",
-    "Understand Docker service name resolution"
-  ],
-  "expected_solution": "Either remove the qdrant section from config/environment.yml or change host from localhost to qdrant",
-  "max_debug_steps": 8,
-  "estimated_time_minutes": 10,
-  "learning_objectives": [
-    "Understanding Docker container networking",
-    "Configuration precedence and override patterns",
-    "Debugging connection issues in containerized applications",
-    "Inspecting runtime configuration",
-    "Service name resolution in Docker Compose"
-  ],
   "initial_evidence": "Hi I have a Problem: My rag-agent is failing to connect to my vectordb container.\n\nI have no error details.\n\nContext:\n- Vectordb should be running in a Docker container\n- Expected to be accessible from the rag-agent container\n- docker-compose.yml exists in the project root"
 }
