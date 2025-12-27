@@ -1,0 +1,30 @@
+services:
+  # Mock API server (the "new" endpoint)
+  mock_api:
+    image: kennethreitz/httpbin
+    container_name: s002_mock_api
+    ports:
+      - "8080:80"
+    networks:
+      - s002_network
+
+  # Client service that should connect to mock_api
+  # BUG: The image was built with the old API endpoint and needs rebuilding
+  api_client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # This argument is read from .env file
+        # When changed in .env, the image needs to be rebuilt with --no-cache
+        API_ENDPOINT_URL: ${API_ENDPOINT_URL}
+    container_name: s002_api_client
+    command: ["sh", "-c", "python app.py || true; sleep infinity"]
+    depends_on:
+      - mock_api
+    networks:
+      - s002_network
+
+networks:
+  s002_network:
+    driver: bridge

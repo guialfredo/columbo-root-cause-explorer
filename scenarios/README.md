@@ -11,6 +11,7 @@ Each scenario includes the necessary infrastructure files (docker-compose, manif
 | ID | Name | Difficulty | Services | Bug Type | Description |
 |----|------|------------|----------|----------|-------------|
 | s001 | Environment Override | 🟡 Medium | RAG Agent, Qdrant | Configuration | Environment variable `QDRANT_HOST` is overridden by YAML config file, causing connection failure to vector database |
+| s002 | Image Not Rebuilt | 🟡 Medium | API Client, Mock API | Build Cache | Build argument changed in `.env` file but image not rebuilt, causing service to use stale endpoint |
 
 ### Difficulty Levels
 - 🟢 **Easy**: Single service, straightforward issue

@@ -1,9 +1,3 @@
-# This file is loaded by application code at runtime
-# and overrides environment variables.
-#
-# BUG: This file contains 'localhost' which is incorrect
-# inside a Docker container. The correct value is 'qdrant'
-# (the service name from docker-compose.yml)
 qdrant:
-  host: localhost  # ← This is the bug!
+  host: localhost  
   port: 6333
