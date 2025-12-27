@@ -202,8 +202,8 @@ def detect_config_files_probe(
     config_patterns = {
         ".env": "environment_variables",
         ".env.*": "environment_variables",
-        "environment.yaml": "generic_config",
-        "environment.yml": "generic_config",
+        "environment.yaml": "environment_variables",
+        "environment.yml": "environment_variables",
         "docker-compose.yaml": "docker_compose",
         "docker-compose.yml": "docker_compose",
         "docker-compose.*.yaml": "docker_compose",
@@ -289,14 +289,14 @@ def detect_config_files_probe(
 
 
 def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing"):
-    """Parse .env files to extract environment variables.
+    """Parse environment variable files (.env, environment.yml/yaml) to extract variables.
     
     Args:
-        found_files: List of dicts with 'absolute_path' keys pointing to .env files
+        found_files: List of dicts with 'absolute_path' keys pointing to env files
         probe_name: Name of the probe for identification
     
     Returns:
-        dict: Contains parsed environment variables from each .env file
+        dict: Contains parsed environment variables from each file
     """
     parsed_envs = []
     
@@ -306,18 +306,34 @@ def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing"):
             continue
         
         env_vars = {}
+        file_format = "unknown"
         try:
-            with open(path, "r") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if "=" in line:
-                        key, value = line.split("=", 1)
-                        env_vars[key.strip()] = value.strip().strip('"').strip("'")
+            file_path = Path(path)
+            
+            # Determine file format and parse accordingly
+            if file_path.suffix in [".yml", ".yaml"]:
+                # Parse as YAML
+                file_format = "yaml"
+                with open(path, "r") as f:
+                    content = yaml.safe_load(f)
+                    if isinstance(content, dict):
+                        # Flatten nested dict to simple key-value pairs
+                        env_vars = {str(k): str(v) for k, v in content.items()}
+            else:
+                # Parse as .env format (KEY=value lines)
+                file_format = "dotenv"
+                with open(path, "r") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#"):
+                            continue
+                        if "=" in line:
+                            key, value = line.split("=", 1)
+                            env_vars[key.strip()] = value.strip().strip('"').strip("'")
             
             parsed_envs.append({
                 "file_path": path,
+                "file_format": file_format,
                 "variables": env_vars,
                 "variable_count": len(env_vars),
                 "parsed": True,
@@ -326,6 +342,7 @@ def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing"):
         except Exception as e:
             parsed_envs.append({
                 "file_path": path,
+                "file_format": file_format,
                 "variables": {},
                 "variable_count": 0,
                 "parsed": False,

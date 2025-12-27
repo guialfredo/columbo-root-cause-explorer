@@ -57,6 +57,7 @@ htmlcov/
 
 # Debug sessions
 debug_sessions/
+evaluation_results/
 
 # Poetry
 poetry.lock
@@ -72,3 +73,5 @@ poetry.lock
 # Docker
 *.env.docker
 docker-compose.override.yml
+
+

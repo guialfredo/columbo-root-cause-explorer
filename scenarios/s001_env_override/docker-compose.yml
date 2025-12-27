@@ -1,19 +1,18 @@
 services:
   qdrant:
     image: qdrant/qdrant:latest
-    container_name: qdrant
+    container_name: s001_qdrant
     ports:
       - "6333:6333"
       - "6334:6334"
-    volumes:
-      - qdrant_data:/qdrant/storage
+    networks:
+      - s001_network
 
-  rag-agent:
+  rag_agent:
     build:
-      context: ./rag_agent
-    container_name: rag-agent
-    depends_on:
-      - qdrant
+      context: .
+      dockerfile: Dockerfile
+    container_name: s001_rag_agent
     environment:
       # Everything here is correct and points to the qdrant service name
       QDRANT_HOST: "${QDRANT_HOST}"
@@ -24,6 +23,14 @@ services:
       APP_CONFIG_PATH: "/app/config/environment.yml"
 
     command: ["sh", "-lc", "python app.py || true; sleep infinity"]
+    depends_on:
+      - qdrant
+    networks:
+      - s001_network
+
+networks:
+  s001_network:
+    driver: bridge
 
 volumes:
   qdrant_data:

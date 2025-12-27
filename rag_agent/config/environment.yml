@@ -1,5 +1,0 @@
-# This file is loaded by application code at runtime
-# and overrides environment values.
-qdrant:
-  host: localhost
-  port: 6333

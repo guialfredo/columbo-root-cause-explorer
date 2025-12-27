@@ -1,0 +1,18 @@
+{
+  "scenario_id": "S001",
+  "title": "Environment Variable Override via Runtime Config",
+  "difficulty": "medium",
+  "category": "configuration",
+  "grading": {
+    "expected_root_cause_id": "ENV_OVERRIDE_RUNTIME_CONFIG",
+    "proof_requirements": [
+      { "type": "file_value", "path": "config/environment.yml", "contains": "localhost" },
+      { "type": "runtime_connection", "service": "rag_agent", "host": "localhost", "port": 6333 }
+    ]
+  },
+  "budgets": {
+    "max_steps": 8,
+    "optimal_steps": 4
+  },
+  "initial_evidence": "Hi I have a Problem: My rag-agent is failing to connect to my vectordb container.\n\nI have no error details.\n\nContext:\n- Vectordb should be running in a Docker container\n- Expected to be accessible from the rag-agent container\n- docker-compose.yml exists in the project root"
+}

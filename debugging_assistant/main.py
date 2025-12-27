@@ -15,7 +15,7 @@ import os
 def setup_dspy_llm(api_key: str):
     """Configure DSPy with your LLM of choice."""
     # For demo purposes, using OpenAI
-    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=True)
+    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=False)
     dspy.configure(lm=lm)
 
 
