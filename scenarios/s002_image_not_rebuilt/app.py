@@ -5,9 +5,7 @@ import requests
 def main():
     """
     Service that connects to an external API endpoint.
-    The API endpoint URL is BAKED INTO THE IMAGE at build time.
     """
-    # This value was set at IMAGE BUILD TIME via ARG -> ENV
     api_endpoint = os.getenv("API_ENDPOINT", "http://api.old-domain.com/health")
     
     print("=" * 60)
