@@ -3,16 +3,17 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
-name = "dspy_tests"
+name = "debugging_assistant"
 version = "0.1.0"
-description = "Small API tests project"
+description = "Columbo is a debugging assistant specialized in local container based architectures (for the moment)"
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.15"
 requests = "*"
-mistralai = "*"
 python-dotenv = "*"
 scikit-learn = "*"
-faiss-cpu = "*"
 numpy = "*"
+pydantic = "^2.12.5"
+docker = "^7.1.0"
+dspy = "*"
