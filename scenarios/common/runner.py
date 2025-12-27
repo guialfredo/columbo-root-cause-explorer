@@ -103,12 +103,6 @@ def tear_down_scenario(spec: ComposeSpec) -> None:
     compose_down(spec, volumes=True)
 
 
-
-
-
-
-
-
 def cleanup_scenario_containers(
     scenario_id: str,
     force: bool = False,
