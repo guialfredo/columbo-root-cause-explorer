@@ -32,7 +32,6 @@ from debugging_assistant.debug_loop import debug_loop
 from debugging_assistant.session_utils import (
     save_session_to_file,
     generate_session_report,
-    analyze_probe_performance,
 )
 
 

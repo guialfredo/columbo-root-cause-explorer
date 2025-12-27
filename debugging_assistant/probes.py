@@ -308,10 +308,10 @@ def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing"):
         env_vars = {}
         file_format = "unknown"
         try:
-            path_obj = Path(path)
+            file_path = Path(path)
             
             # Determine file format and parse accordingly
-            if path_obj.suffix in [".yml", ".yaml"]:
+            if file_path.suffix in [".yml", ".yaml"]:
                 # Parse as YAML
                 file_format = "yaml"
                 with open(path, "r") as f:

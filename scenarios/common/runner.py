@@ -8,7 +8,7 @@ from typing import Any
 from pydantic import BaseModel, Field, field_validator
 import docker
 
-from scenarios.common.docker_compose_utils import ComposeSpec, compose_up, compose_down, compose_ps
+from scenarios.common.docker_compose_utils import ComposeSpec, compose_up, compose_down
 
 
 class ScenarioManifest(BaseModel):
