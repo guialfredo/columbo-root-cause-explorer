@@ -2,8 +2,8 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Install dependencies
-RUN pip install --no-cache-dir requests
+# Install dependencies with pinned versions
+RUN pip install --no-cache-dir requests==2.31.0
 
 ARG API_ENDPOINT_URL=http://api.old-domain.com/health
 
