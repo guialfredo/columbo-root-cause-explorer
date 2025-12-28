@@ -48,7 +48,7 @@ A developer updated the `API_ENDPOINT_URL` in the `.env` file to point to a new 
 ## Root Cause
 **ID**: `IMAGE_NOT_REBUILT`
 
-**Summary**: When build arguments (ARG) are changed in the `.env` file or docker-compose.yml, Docker's layer caching can cause the image to be reused with old values baked in. Build arguments are resolved at image build time and become immutable once the image is created. Simply running `docker-compose up` without `--build` or `--no-cache` won't pick up the new values.
+**Summary**: When build arguments (ARG) are changed in the `.env` file or docker-compose.yml, Docker's layer caching can cause the image to be reused with old values baked in. Build arguments are resolved at image build time and become immutable once the image is created. Simply running `docker-compose up` without `--build` won't pick up the new values.
 
 **Key Concept**: Unlike runtime environment variables (which can be changed without rebuilding), build arguments (ARG) are compiled into the image layers. Changing them requires:
 - Rebuilding the image: `docker-compose up --build`
@@ -62,7 +62,7 @@ A developer updated the `API_ENDPOINT_URL` in the `.env` file to point to a new 
 5. Check the Dockerfile and discover `ARG API_ENDPOINT_URL` + `ENV API_ENDPOINT=${API_ENDPOINT_URL}`
 6. Realize that ARG values are baked in at build time
 7. Check image build date/time and confirm it's old (pre-dates the .env change)
-8. Identify solution: rebuild with `docker-compose up --build --no-cache`
+8. Identify solution: rebuild with `docker-compose build --no-cache && docker-compose up`
 
 ## Expected Behavior
 - The mock_api container starts successfully and is healthy
