@@ -428,7 +428,7 @@ def check_and_resolve_conflicts(
         # Provide manual instructions
         print("\n❌ Cannot proceed with existing containers")
         print("\nOptions:")
-        print("  1. Run with --cleanup to automatically remove ALL existing scenario containers and volumes")
+        print(f"  1. Run with --cleanup to automatically remove all {len(all_columbo)} container(s) and {len(columbo_volumes)} volume(s) listed below")
         print("  2. Manually remove the containers:")
         for container in all_columbo:
             print(f"     docker rm -f {container.name}")
