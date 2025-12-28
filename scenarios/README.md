@@ -13,6 +13,7 @@ Each scenario includes the necessary infrastructure files (docker-compose, manif
 | s001 | Environment Override | 🟡 Medium | RAG Agent, Qdrant | Configuration | Environment variable `QDRANT_HOST` is overridden by YAML config file, causing connection failure to vector database |
 | s002 | Image Not Rebuilt | 🟡 Medium | API Client, Mock API | Build Cache | Build argument changed in `.env` file but image not rebuilt, causing service to use stale endpoint |
 | s003 | Stale Volume State | 🟡 Medium | Single App | Persistent State | Named Docker volume contains incompatible schema version from previous deployment, causing immediate crash despite correct image rebuild |
+| s004 | Port Blocker | 🟢 Easy | RAG Agent, Qdrant | Networking | Leftover container from previous session occupies port 6333, preventing Qdrant from starting and blocking entire stack |
 
 ### Difficulty Levels
 - 🟢 **Easy**: Single service, straightforward issue
