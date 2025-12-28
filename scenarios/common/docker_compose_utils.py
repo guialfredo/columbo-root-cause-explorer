@@ -36,7 +36,7 @@ class ComposeSpec(BaseModel):
         return v
 
 
-def _run(cmd: Sequence[str], cwd: Path, env: dict[str, str]) -> str:
+def _run(cmd: Sequence[str], cwd: Path, env: dict[str, str], check: bool = True) -> str:
     p = subprocess.run(
         list(cmd),
         cwd=str(cwd),
@@ -47,7 +47,7 @@ def _run(cmd: Sequence[str], cwd: Path, env: dict[str, str]) -> str:
         check=False,
     )
     out = p.stdout or ""
-    if p.returncode != 0:
+    if check and p.returncode != 0:
         raise RuntimeError(f"Command failed ({p.returncode}): {' '.join(cmd)}\n{out}")
     return out
 
@@ -62,7 +62,7 @@ def _base_env(extra_env: Optional[dict[str, str]] = None) -> dict[str, str]:
     return env
 
 
-def compose_up(spec: ComposeSpec, *, detach: bool = True, build: bool = True) -> str:
+def compose_up(spec: ComposeSpec, *, detach: bool = True, build: bool = True, check: bool = True) -> str:
     cmd = ["docker", "compose", "-p", spec.project_name, "-f", str(spec.compose_file)]
     if spec.env_file:
         cmd += ["--env-file", str(spec.env_file)]
@@ -73,7 +73,7 @@ def compose_up(spec: ComposeSpec, *, detach: bool = True, build: bool = True) ->
         cmd += ["-d"]
     if build:
         cmd += ["--build"]
-    return _run(cmd, cwd=spec.workdir, env=_base_env())
+    return _run(cmd, cwd=spec.workdir, env=_base_env(), check=check)
 
 
 def compose_down(spec: ComposeSpec, *, volumes: bool = True) -> str:
