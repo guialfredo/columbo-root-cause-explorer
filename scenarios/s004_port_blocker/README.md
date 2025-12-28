@@ -76,15 +76,8 @@ A RAG agent application needs to connect to a Qdrant vector database on port 633
 - **Key**: The agent must discover the port conflict through probes, not from handed error messages
 - Investigation requires checking container states, logs, and system-wide port usage
 
-## Why Rebuilding Doesn't Fix This
-- **Port conflicts are host-level issues**, not related to images or builds
-- Rebuilding images with `docker compose up --build` doesn't affect running containers from other projects
-- `docker compose down` only stops/removes containers created by the current project
-- The blocker container (`data_processor_dev`) is independent and must be explicitly removed
-- This is by design: Docker doesn't automatically clean up containers from different projects or manual `docker run` commands
-
 ## Difficulty Level
-**Medium** - Requires understanding of:
+**Easy** - Requires understanding of:
 - Docker port publishing and host-level port binding
 - The difference between project-scoped containers and system-wide containers
 - Container lifecycle and persistence across compose projects
