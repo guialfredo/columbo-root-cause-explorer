@@ -2,7 +2,7 @@ import json
 import docker
 from datetime import datetime
 from typing import Optional
-from debugging_assistant.modules import (
+from columbo.modules import (
     hypothesis_gen, 
     probe_planner, 
     evidence_digest, 
@@ -12,8 +12,8 @@ from debugging_assistant.modules import (
     ProbePlanningInput,
     EvidenceDigestInput,
 )
-from debugging_assistant.probes import probe_registry, PROBE_DEPENDENCIES, build_tools_spec, validate_probe_args, PROBE_SCHEMAS
-from debugging_assistant.schemas import (
+from columbo.probes import probe_registry, PROBE_DEPENDENCIES, build_tools_spec, validate_probe_args, PROBE_SCHEMAS
+from columbo.schemas import (
     DebugSession,
     ProbeCall,
     Finding,
