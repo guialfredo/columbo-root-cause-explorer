@@ -105,8 +105,8 @@ echo "OPENAI_API_KEY=your-api-key-here" > .env
 ### Basic Usage
 
 ```python
-from debugging_assistant.debug_loop import debug_loop
-from debugging_assistant.session_utils import save_session_to_file, generate_session_report
+from columbo.debug_loop import debug_loop
+from columbo.session_utils import save_session_to_file, generate_session_report
 
 # Define your problem
 initial_evidence = """
@@ -142,7 +142,7 @@ generate_session_report(session_model, output_dir="./debug_sessions")
 ### Running the Example
 
 ```bash
-python -m debugging_assistant.main
+python -m columbo.main
 ```
 
 This will run the example debugging session and save:
@@ -231,7 +231,7 @@ Recommended Fixes:
 
 ```
 api_tests/
-├── debugging_assistant/
+├── columbo/
 │   ├── debug_loop.py        # Main debug loop orchestration
 │   ├── modules.py           # DSPy reasoning modules
 │   ├── probes.py            # Diagnostic probe implementations
@@ -263,7 +263,7 @@ PROBE_DEPENDENCIES = {
 ### Session Analytics
 
 ```python
-from debugging_assistant.session_utils import analyze_probe_performance
+from columbo.session_utils import analyze_probe_performance
 
 perf = analyze_probe_performance(session_model)
 print(f"Total time: {perf['total_time']:.2f}s")

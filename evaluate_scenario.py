@@ -28,8 +28,8 @@ from scenarios.common.runner import (
     tear_down_scenario,
     check_and_resolve_conflicts,
 )
-from debugging_assistant.debug_loop import debug_loop
-from debugging_assistant.session_utils import (
+from columbo.debug_loop import debug_loop
+from columbo.session_utils import (
     save_session_to_file,
     generate_session_report,
 )

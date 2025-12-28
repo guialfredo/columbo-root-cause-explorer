@@ -1,5 +1,5 @@
 import dspy
-from debugging_assistant.schemas import (
+from columbo.schemas import (
     EvidenceInput,
     ProbePlanningInput,
     EvidenceDigestInput,
