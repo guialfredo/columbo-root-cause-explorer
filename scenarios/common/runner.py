@@ -148,7 +148,7 @@ def run_scenario_setup(sref: ScenarioRef) -> None:
 
 
 def spin_up_scenario(sref: ScenarioRef, *, profiles: tuple[str, ...] = ()) -> ComposeSpec:
-    # Run setup script if present (e.g., seeding volumes)
+    # Run setup script if present (e.g., seeding volumes, creating blockers)
     run_scenario_setup(sref)
     
     project_name = make_project_name(sref.scenario_id)
@@ -159,7 +159,9 @@ def spin_up_scenario(sref: ScenarioRef, *, profiles: tuple[str, ...] = ()) -> Co
         env_file=None,
         profiles=profiles,
     )
-    compose_up(spec, detach=True, build=True)
+    # Tolerate failures - some scenarios (like port conflicts) are designed to fail
+    # The agent must discover the failure through investigation, not from errors here
+    compose_up(spec, detach=True, build=True, check=False)
     return spec
 
 
