@@ -10,7 +10,7 @@ from pathlib import Path
 import json
 from datetime import datetime
 from typing import Optional
-from debugging_assistant.schemas import (
+from columbo.schemas import (
     DebugSession,
     FinalArtifact,
     InvestigationMetadata,
