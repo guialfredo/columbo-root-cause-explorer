@@ -1,20 +1,38 @@
 from pathlib import Path
 import sys
 
-EXPECTED = "2"
-p = Path("/data/schema_version.txt")
+print("=" * 50)
+print("Application Startup - Data Validation")
+print("=" * 50)
 
-if not p.exists():
-    print("No schema version found. Initializing schema_version=2")
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(EXPECTED)
-    print("OK")
+EXPECTED_SCHEMA_VERSION = "2"
+SCHEMA_FILE_PATH = Path("/data/schema_version.txt")
+
+print(f"Validating persistent data compatibility...")
+print(f"Data location: {SCHEMA_FILE_PATH}")
+
+if not SCHEMA_FILE_PATH.exists():
+    print("No existing schema version found. Initializing fresh data store.")
+    SCHEMA_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    SCHEMA_FILE_PATH.write_text(EXPECTED_SCHEMA_VERSION)
+    print(f"Initialized with schema version: {EXPECTED_SCHEMA_VERSION}")
+    print("Application ready.")
     sys.exit(0)
 
-found = p.read_text().strip()
-if found != EXPECTED:
-    print(f"FATAL: incompatible persistent state in volume: schema_version={found}, expected={EXPECTED}")
-    print("Hint: you may need to migrate data or reset the volume.")
+found_version = SCHEMA_FILE_PATH.read_text().strip()
+print(f"Found existing schema version: {found_version}")
+print(f"Application requires schema version: {EXPECTED_SCHEMA_VERSION}")
+
+if found_version != EXPECTED_SCHEMA_VERSION:
+    print("\n" + "!" * 50)
+    print("ERROR: Schema Version Mismatch")
+    print("!" * 50)
+    print(f"The persistent data store contains schema version {found_version},")
+    print(f"but this application version requires schema version {EXPECTED_SCHEMA_VERSION}.")
+    print("\nThis typically occurs after upgrading the application without")
+    print("migrating or resetting the persistent storage layer.")
+    print("\nThe application cannot start with incompatible data.")
     sys.exit(1)
 
-print("OK")
+print("Schema validation passed.")
+print("Application ready.")
