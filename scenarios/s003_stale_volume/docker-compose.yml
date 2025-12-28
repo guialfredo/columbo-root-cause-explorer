@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: s003_app
+    volumes:
+      - s003_data:/data
+    command: ["sh", "-c", "python app.py || true; sleep infinity"]
+
+volumes:
+  s003_data:
