@@ -4,6 +4,11 @@ import json
 import time
 from pathlib import Path
 from typing import Any
+import re
+import subprocess
+import os
+import stat
+
 
 from pydantic import BaseModel, Field, field_validator
 import docker
@@ -109,10 +114,6 @@ def run_scenario_setup(sref: ScenarioRef) -> None:
     """
     if sref.setup_script is None:
         return
-    
-    import subprocess
-    import os
-    import stat
     
     print(f"Running setup script: {sref.setup_script.name}")
     
@@ -234,19 +235,22 @@ def cleanup_all_columbo_containers(
         
     Returns:
         Tuple of (successfully_removed, failed_to_remove) container names
-    """
+    """    
     success = []
     failed = []
+    
+    # Pattern for scenario containers: s001_app, s002_web, s003_app, etc.
+    scenario_pattern = re.compile(r'^s\d{3}_')
     
     try:
         client = docker.from_env()
         all_containers = client.containers.list(all=True)
         
-        # Find all Columbo scenario containers (s001, s002, s003, etc.)
+        # Find all Columbo scenario containers
         columbo_containers = [
             c for c in all_containers 
             if c.labels.get('com.docker.compose.project', '').startswith('columbo_') or
-               any(c.name.lower().startswith(f's{i:03d}_') for i in range(1, 100))
+               scenario_pattern.match(c.name.lower())
         ]
         
         if not columbo_containers:
@@ -283,14 +287,19 @@ def cleanup_columbo_volumes() -> tuple[list[str], list[str]]:
     """Remove all volumes associated with Columbo scenarios.
     
     Removes:
-    - Volumes with 'columbo_' prefix in their name
-    - Scenario-specific volumes like 's001_data', 's002_data', 's003_data'
+    - Volumes with 'columbo_' prefix (from runner-managed scenarios)
+    - Volumes matching pattern 's###_*' (from manual compose runs)
     
     Returns:
         Tuple of (successfully_removed, failed_to_remove) volume names
     """
+    import re
+    
     success = []
     failed = []
+    
+    # Pattern for scenario volumes: s001_data, s002_cache, s003_data, etc.
+    scenario_pattern = re.compile(r'^s\d{3}_')
     
     try:
         client = docker.from_env()
@@ -299,8 +308,7 @@ def cleanup_columbo_volumes() -> tuple[list[str], list[str]]:
         # Find Columbo-related volumes
         columbo_volumes = [
             v for v in all_volumes
-            if v.name.startswith('columbo_') or
-               any(v.name.startswith(f's{i:03d}_') for i in range(1, 100))
+            if v.name.startswith('columbo_') or scenario_pattern.match(v.name)
         ]
         
         if not columbo_volumes:
@@ -340,6 +348,11 @@ def check_and_resolve_conflicts(
     Returns:
         True if no conflicts or resolved successfully, False otherwise
     """
+    import re
+    
+    # Pattern for scenario containers: s001_app, s002_web, s003_app, etc.
+    scenario_pattern = re.compile(r'^s\d{3}_')
+    
     try:
         client = docker.from_env()
         all_containers = client.containers.list(all=True)
@@ -348,7 +361,7 @@ def check_and_resolve_conflicts(
         all_columbo = [
             c for c in all_containers
             if c.labels.get('com.docker.compose.project', '').startswith('columbo_') or
-               any(c.name.lower().startswith(f's{i:03d}_') for i in range(1, 100))
+               scenario_pattern.match(c.name.lower())
         ]
         
         # Find containers specific to this scenario
@@ -377,10 +390,10 @@ def check_and_resolve_conflicts(
         
         # Check for existing volumes
         all_volumes = client.volumes.list()
+        volume_pattern = re.compile(r'^s\d{3}_')
         columbo_volumes = [
             v for v in all_volumes
-            if v.name.startswith('columbo_') or
-               any(v.name.startswith(f's{i:03d}_') for i in range(1, 100))
+            if v.name.startswith('columbo_') or volume_pattern.match(v.name)
         ]
         
         if columbo_volumes:
