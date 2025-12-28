@@ -32,14 +32,5 @@
     "max_steps": 10,
     "optimal_steps": 5
   },
-  "initial_evidence": "Hi, I have an issue with my container. I updated the API endpoint in my .env file but the container still tries to connect to the old endpoint. The changes I made don't seem to take effect even though I restarted the containers with docker-compose up.",
-  "setup_instructions": {
-    "description": "Build image with old endpoint first, then update .env to simulate cache issue",
-    "steps": [
-      "Create temporary .env with old endpoint: API_ENDPOINT_URL=http://api.old-domain.com/health",
-      "Run: docker-compose build",
-      "Update .env with new endpoint: API_ENDPOINT_URL=http://mock_api/status/200",
-      "Run: docker-compose up (WITHOUT --build to trigger the bug)"
-    ]
-  }
+  "initial_evidence": "Hi, I have an issue with my container. I updated the API endpoint in my .env file but the container still tries to connect to the old endpoint. The changes I made don't seem to take effect even though I restarted the containers with docker-compose up."
 }
