@@ -6,7 +6,7 @@ services:
     container_name: s003_app
     volumes:
       - s003_data:/data
-    command: ["sh", "-lc", "python app.py || true; sleep infinity"]
+    command: ["sh", "-c", "python app.py || true; sleep infinity"]
 
 volumes:
   s003_data:

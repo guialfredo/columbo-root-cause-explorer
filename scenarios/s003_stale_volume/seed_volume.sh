@@ -28,6 +28,6 @@ docker volume create "$VOLUME_NAME" >/dev/null
 docker run --rm \
   -v "${VOLUME_NAME}:/data" \
   alpine:3.20 \
-  sh -lc "mkdir -p /data && echo '${SCHEMA_VERSION}' > /data/schema_version.txt && cat /data/schema_version.txt"
+  sh -c "mkdir -p /data && echo '${SCHEMA_VERSION}' > /data/schema_version.txt && cat /data/schema_version.txt"
 
 echo "✓ Volume seeded"
