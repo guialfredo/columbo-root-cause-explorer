@@ -33,6 +33,7 @@ class ScenarioRef(BaseModel):
     scenario_dir: Path = Field(..., description="Root directory of the scenario")
     compose_file: Path = Field(..., description="Path to compose file (compose.yaml or docker-compose.yml)")
     manifest_file: Path = Field(..., description="Path to manifest.json")
+    setup_script: Path | None = Field(None, description="Optional setup script (setup.sh) to run before compose up")
     
     class Config:
         frozen = True
@@ -43,6 +44,13 @@ class ScenarioRef(BaseModel):
     def validate_path_exists(cls, v: Path, info) -> Path:
         if not v.exists():
             raise ValueError(f"{info.field_name} does not exist: {v}")
+        return v
+    
+    @field_validator('setup_script')
+    @classmethod
+    def validate_setup_script(cls, v: Path | None) -> Path | None:
+        if v is not None and not v.exists():
+            raise ValueError(f"setup_script does not exist: {v}")
         return v
     
     def load_manifest(self) -> ScenarioManifest:
@@ -73,11 +81,17 @@ def load_scenario(scenarios_root: Path, scenario_id: str) -> ScenarioRef:
     if not manifest_file.exists():
         raise FileNotFoundError(f"manifest.json not found for scenario: {manifest_file}")
 
+    # Check for optional setup script
+    setup_script = d / "setup.sh"
+    if not setup_script.exists():
+        setup_script = None
+
     return ScenarioRef(
         scenario_id=scenario_id,
         scenario_dir=d,
         compose_file=compose_file,
         manifest_file=manifest_file,
+        setup_script=setup_script,
     )
 
 
@@ -86,7 +100,56 @@ def make_project_name(scenario_id: str) -> str:
     return f"columbo_{scenario_id.lower()}_{int(time.time())}"
 
 
+def run_scenario_setup(sref: ScenarioRef) -> None:
+    """Execute the scenario's setup script if one exists.
+    
+    The setup script runs from the scenario directory.
+    Ensures script permissions are set before execution.
+    Raises RuntimeError if the setup script fails.
+    """
+    if sref.setup_script is None:
+        return
+    
+    import subprocess
+    import os
+    import stat
+    
+    print(f"Running setup script: {sref.setup_script.name}")
+    
+    # Ensure the setup script is executable
+    current_permissions = os.stat(sref.setup_script).st_mode
+    if not (current_permissions & stat.S_IXUSR):
+        os.chmod(sref.setup_script, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    
+    # Also ensure any .sh files in the scenario directory are executable
+    for sh_file in sref.scenario_dir.glob("*.sh"):
+        current_permissions = os.stat(sh_file).st_mode
+        if not (current_permissions & stat.S_IXUSR):
+            os.chmod(sh_file, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    
+    try:
+        result = subprocess.run(
+            ["bash", str(sref.setup_script)],
+            cwd=sref.scenario_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        if result.stdout:
+            print(result.stdout)
+        print(f"✓ Setup script completed successfully")
+        
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Setup script failed with exit code {e.returncode}"
+        if e.stderr:
+            error_msg += f"\n{e.stderr}"
+        raise RuntimeError(error_msg) from e
+
+
 def spin_up_scenario(sref: ScenarioRef, *, profiles: tuple[str, ...] = ()) -> ComposeSpec:
+    # Run setup script if present (e.g., seeding volumes)
+    run_scenario_setup(sref)
+    
     project_name = make_project_name(sref.scenario_id)
     spec = ComposeSpec(
         project_name=project_name,
@@ -159,6 +222,106 @@ def cleanup_scenario_containers(
     return success, failed
 
 
+def cleanup_all_columbo_containers(
+    force: bool = False,
+    timeout: int = 5
+) -> tuple[list[str], list[str]]:
+    """Stop and remove ALL containers from any Columbo scenario.
+    
+    Args:
+        force: If True, force kill containers instead of graceful stop
+        timeout: Seconds to wait for graceful stop before forcing
+        
+    Returns:
+        Tuple of (successfully_removed, failed_to_remove) container names
+    """
+    success = []
+    failed = []
+    
+    try:
+        client = docker.from_env()
+        all_containers = client.containers.list(all=True)
+        
+        # Find all Columbo scenario containers (s001, s002, s003, etc.)
+        columbo_containers = [
+            c for c in all_containers 
+            if c.labels.get('com.docker.compose.project', '').startswith('columbo_') or
+               any(c.name.lower().startswith(f's{i:03d}_') for i in range(1, 100))
+        ]
+        
+        if not columbo_containers:
+            return success, failed
+        
+        for container in columbo_containers:
+            try:
+                if container.status == "running":
+                    if force:
+                        print(f"  Killing {container.name}...")
+                        container.kill()
+                    else:
+                        print(f"  Stopping {container.name}...")
+                        container.stop(timeout=timeout)
+                
+                print(f"  Removing {container.name}...")
+                container.remove()
+                success.append(container.name)
+                print(f"  ✓ Removed {container.name}")
+                
+            except docker.errors.NotFound:
+                success.append(container.name)
+            except Exception as e:
+                failed.append(container.name)
+                print(f"  ✗ Failed to remove {container.name}: {e}")
+        
+    except Exception as e:
+        print(f"Error during cleanup: {e}")
+    
+    return success, failed
+
+
+def cleanup_columbo_volumes() -> tuple[list[str], list[str]]:
+    """Remove all volumes associated with Columbo scenarios.
+    
+    Removes:
+    - Volumes with 'columbo_' prefix in their name
+    - Scenario-specific volumes like 's001_data', 's002_data', 's003_data'
+    
+    Returns:
+        Tuple of (successfully_removed, failed_to_remove) volume names
+    """
+    success = []
+    failed = []
+    
+    try:
+        client = docker.from_env()
+        all_volumes = client.volumes.list()
+        
+        # Find Columbo-related volumes
+        columbo_volumes = [
+            v for v in all_volumes
+            if v.name.startswith('columbo_') or
+               any(v.name.startswith(f's{i:03d}_') for i in range(1, 100))
+        ]
+        
+        if not columbo_volumes:
+            return success, failed
+        
+        for volume in columbo_volumes:
+            try:
+                print(f"  Removing volume {volume.name}...")
+                volume.remove()
+                success.append(volume.name)
+                print(f"  ✓ Removed volume {volume.name}")
+            except Exception as e:
+                failed.append(volume.name)
+                print(f"  ✗ Failed to remove volume {volume.name}: {e}")
+        
+    except Exception as e:
+        print(f"Error during volume cleanup: {e}")
+    
+    return success, failed
+
+
 def check_and_resolve_conflicts(
     scenario_id: str,
     auto_cleanup: bool = False,
@@ -166,9 +329,12 @@ def check_and_resolve_conflicts(
 ) -> bool:
     """Check for existing scenario containers and optionally clean them up.
     
+    When auto_cleanup is True, cleans up ALL Columbo scenario containers,
+    not just the current scenario.
+    
     Args:
         scenario_id: Scenario identifier to check
-        auto_cleanup: If True, automatically cleanup existing containers
+        auto_cleanup: If True, automatically cleanup ALL existing Columbo containers
         force: If True, force kill containers during cleanup
         
     Returns:
@@ -178,43 +344,85 @@ def check_and_resolve_conflicts(
         client = docker.from_env()
         all_containers = client.containers.list(all=True)
         
-        # Find containers from previous scenario runs
-        existing = [
+        # Find ALL Columbo scenario containers (not just current scenario)
+        all_columbo = [
             c for c in all_containers
+            if c.labels.get('com.docker.compose.project', '').startswith('columbo_') or
+               any(c.name.lower().startswith(f's{i:03d}_') for i in range(1, 100))
+        ]
+        
+        # Find containers specific to this scenario
+        current_scenario = [
+            c for c in all_columbo
             if scenario_id.lower() in c.name.lower() or
                c.labels.get('com.docker.compose.project', '').startswith(f'columbo_{scenario_id.lower()}')
         ]
         
-        if not existing:
+        # Other scenario containers
+        other_scenarios = [c for c in all_columbo if c not in current_scenario]
+        
+        if not all_columbo:
             return True
         
         # Report existing containers
-        print(f"\n⚠️  Found {len(existing)} existing container(s) from previous runs:")
-        for container in existing:
-            print(f"   - {container.name} ({container.status})")
+        if current_scenario:
+            print(f"\n⚠️  Found {len(current_scenario)} container(s) from previous runs of {scenario_id}:")
+            for container in current_scenario:
+                print(f"   - {container.name} ({container.status})")
+        
+        if other_scenarios:
+            print(f"\n⚠️  Found {len(other_scenarios)} container(s) from other scenarios:")
+            for container in other_scenarios:
+                print(f"   - {container.name} ({container.status})")
+        
+        # Check for existing volumes
+        all_volumes = client.volumes.list()
+        columbo_volumes = [
+            v for v in all_volumes
+            if v.name.startswith('columbo_') or
+               any(v.name.startswith(f's{i:03d}_') for i in range(1, 100))
+        ]
+        
+        if columbo_volumes:
+            print(f"\n⚠️  Found {len(columbo_volumes)} volume(s) from previous runs:")
+            for volume in columbo_volumes:
+                print(f"   - {volume.name}")
         
         # Cleanup if requested
         if auto_cleanup:
-            print("\n🧹 Cleaning up existing containers...")
-            success, failed = cleanup_scenario_containers(
-                scenario_id,
-                force=force
-            )
+            print("\n🧹 Cleaning up ALL Columbo scenario containers...")
+            success, failed = cleanup_all_columbo_containers(force=force)
             
             if failed:
-                print(f"\n❌ Failed to cleanup: {', '.join(failed)}")
+                print(f"\n❌ Failed to cleanup containers: {', '.join(failed)}")
                 return False
             
-            print("✓ Cleanup complete")
+            print("✓ Container cleanup complete")
+            
+            # Also cleanup volumes
+            if columbo_volumes:
+                print("\n🧹 Cleaning up ALL Columbo scenario volumes...")
+                vol_success, vol_failed = cleanup_columbo_volumes()
+                
+                if vol_failed:
+                    print(f"\n⚠️  Failed to cleanup some volumes: {', '.join(vol_failed)}")
+                    print("Note: Volumes may be in use. Try stopping all containers first.")
+                else:
+                    print("✓ Volume cleanup complete")
+            
             return True
         
         # Provide manual instructions
         print("\n❌ Cannot proceed with existing containers")
         print("\nOptions:")
-        print("  1. Run with --cleanup to automatically remove existing containers")
+        print("  1. Run with --cleanup to automatically remove ALL existing scenario containers and volumes")
         print("  2. Manually remove the containers:")
-        for container in existing:
+        for container in all_columbo:
             print(f"     docker rm -f {container.name}")
+        if columbo_volumes:
+            print("  3. Manually remove the volumes:")
+            for volume in columbo_volumes:
+                print(f"     docker volume rm {volume.name}")
         
         return False
         

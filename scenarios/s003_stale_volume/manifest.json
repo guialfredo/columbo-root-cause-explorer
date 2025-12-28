@@ -1,0 +1,15 @@
+{
+  "scenario_id": "s003_stale_volume",
+  "title": "Everything is correct in the code + image + env, but a named volume contains stale/incompatible state",
+  "difficulty": "medium",
+  "category": "volumes",
+  "grading": {
+    "expected_root_cause_id": "STALE_VOLUME_CAUSING_ISSUE",
+    "proof_requirements": []
+  },
+  "budgets": {
+    "max_steps": 8,
+    "optimal_steps": 4
+  },
+  "initial_evidence": "My container fails after I updated the app. I rebuilt the image but it still crashes immediately.\n\nError mentions incompatible state / schema version.\n\nI’m using docker compose."
+}
