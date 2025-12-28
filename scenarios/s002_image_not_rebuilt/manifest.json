@@ -1,0 +1,45 @@
+{
+  "scenario_id": "S002",
+  "title": "Image Not Rebuilt After Build Arg Change",
+  "difficulty": "medium",
+  "category": "build-configuration",
+  "grading": {
+    "expected_root_cause_id": "IMAGE_NOT_REBUILT",
+    "proof_requirements": [
+      { 
+        "type": "file_value", 
+        "path": ".env", 
+        "contains": "http://mock_api/status/200",
+        "description": ".env file should contain the new API endpoint"
+      },
+      { 
+        "type": "image_inspection", 
+        "service": "api_client",
+        "env_var": "API_ENDPOINT",
+        "should_not_contain": "api.old-domain.com",
+        "description": "Image should not contain the old API endpoint after rebuild"
+      },
+      {
+        "type": "build_argument_mismatch",
+        "service": "api_client",
+        "arg_name": "API_ENDPOINT_URL",
+        "expected_in_env": "http://mock_api/status/200",
+        "description": "Build argument in .env differs from value baked into image"
+      }
+    ]
+  },
+  "budgets": {
+    "max_steps": 10,
+    "optimal_steps": 5
+  },
+  "initial_evidence": "Hi, I have an issue with my container. I updated the API endpoint in my .env file but the container still tries to connect to the old endpoint. The changes I made don't seem to take effect even though I restarted the containers with docker-compose up.",
+  "setup_instructions": {
+    "description": "Build image with old endpoint first, then update .env to simulate cache issue",
+    "steps": [
+      "Create temporary .env with old endpoint: API_ENDPOINT_URL=http://api.old-domain.com/health",
+      "Run: docker-compose build",
+      "Update .env with new endpoint: API_ENDPOINT_URL=http://mock_api/status/200",
+      "Run: docker-compose up (WITHOUT --build to trigger the bug)"
+    ]
+  }
+}
