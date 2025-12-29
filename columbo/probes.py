@@ -235,11 +235,26 @@ def volume_data_inspection_probe(
         import docker
 
         client = docker.from_env()
+        
+        # Ensure alpine image is available locally
+        image_name = "alpine:latest"
+        try:
+            client.images.pull(image_name)
+        except Exception as pull_error:
+            return {
+                "volume_name": volume_name,
+                "sample_path": sample_path,
+                "file_listing": None,
+                "probe_name": probe_name,
+                "error": f"Failed to pull {image_name}: {str(pull_error)}",
+                "error_type": "image_pull_error",
+            }
+        
         volume = client.volumes.get(volume_name)
 
         # Create a temporary container to inspect the volume's contents
         temp_container = client.containers.create(
-            image="alpine:latest",
+            image=image_name,
             command="sleep 10",
             volumes={volume.name: {"bind": "/mnt", "mode": "ro"}},
         )
@@ -315,11 +330,28 @@ def volume_file_read_probe(
         import docker
 
         client = docker.from_env()
+        
+        # Ensure alpine image is available locally
+        image_name = "alpine:latest"
+        try:
+            client.images.pull(image_name)
+        except Exception as pull_error:
+            return {
+                "volume_name": volume_name,
+                "file_path": file_path,
+                "exists": False,
+                "file_contents": None,
+                "file_size": None,
+                "probe_name": probe_name,
+                "error": f"Failed to pull {image_name}: {str(pull_error)}",
+                "error_type": "image_pull_error",
+            }
+        
         volume = client.volumes.get(volume_name)
 
         # Create a temporary container to read the volume's file
         temp_container = client.containers.create(
-            image="alpine:latest",
+            image=image_name,
             command="sleep 10",
             volumes={volume.name: {"bind": "/mnt", "mode": "ro"}},
         )
