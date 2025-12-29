@@ -105,12 +105,16 @@ def make_project_name(scenario_id: str) -> str:
     return f"columbo_{scenario_id.lower()}_{int(time.time())}"
 
 
-def run_scenario_setup(sref: ScenarioRef) -> None:
+def run_scenario_setup(sref: ScenarioRef, project_name: str | None = None) -> None:
     """Execute the scenario's setup script if one exists.
     
     The setup script runs from the scenario directory.
     Ensures script permissions are set before execution.
     Raises RuntimeError if the setup script fails.
+    
+    Args:
+        sref: Scenario reference
+        project_name: Optional project name to pass to setup script via COMPOSE_PROJECT_NAME env var
     """
     if sref.setup_script is None:
         return
@@ -128,10 +132,16 @@ def run_scenario_setup(sref: ScenarioRef) -> None:
         if not (current_permissions & stat.S_IXUSR):
             os.chmod(sh_file, current_permissions | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     
+    # Prepare environment with project name for volume naming consistency
+    env = os.environ.copy()
+    if project_name:
+        env['COMPOSE_PROJECT_NAME'] = project_name
+    
     try:
         result = subprocess.run(
             ["bash", str(sref.setup_script)],
             cwd=sref.scenario_dir,
+            env=env,
             check=True,
             capture_output=True,
             text=True,
@@ -148,10 +158,13 @@ def run_scenario_setup(sref: ScenarioRef) -> None:
 
 
 def spin_up_scenario(sref: ScenarioRef, *, profiles: tuple[str, ...] = ()) -> ComposeSpec:
-    # Run setup script if present (e.g., seeding volumes, creating blockers)
-    run_scenario_setup(sref)
-    
+    # Generate project name first so setup script can use it
     project_name = make_project_name(sref.scenario_id)
+    
+    # Run setup script if present (e.g., seeding volumes, creating blockers)
+    # Pass project name via environment variable for volume naming
+    run_scenario_setup(sref, project_name=project_name)
+    
     spec = ComposeSpec(
         project_name=project_name,
         compose_file=sref.compose_file,
