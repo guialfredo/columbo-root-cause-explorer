@@ -39,7 +39,7 @@ def containers_state_probe(containers: List[Container], probe_name: str = "conta
     return evidence
 
 
-def container_logs_probe(container, tail=50, probe_name: str = "container_logs"):
+def container_logs_probe(container: Container, tail=50, probe_name: str = "container_logs"):
     """Retrieve recent logs from a container.
     
     Args:
@@ -75,7 +75,7 @@ def container_logs_probe(container, tail=50, probe_name: str = "container_logs")
 
 
 def container_exec_probe(
-    container,
+    container: Container,
     command: str,
     tail_chars: int = 4000,
     probe_name: str = "container_exec",
@@ -139,7 +139,7 @@ def container_exec_probe(
         }
 
 
-def container_mounts_probe(container, probe_name: str = "container_mounts"):
+def container_mounts_probe(container: Container, probe_name: str = "container_mounts"):
     """Inspect volume and bind mounts attached to a container.
     
     Essential for understanding which volumes a container is using and where they're mounted.
@@ -231,9 +231,19 @@ def containers_ports_probe(containers: List[Container], probe_name: str = "conta
                     for binding in host_bindings:
                         host_ip = binding.get("HostIp", "0.0.0.0")
                         host_port = binding.get("HostPort")
+                        
+                        # Safely convert host_port to int (probes must never raise exceptions)
+                        host_port_int = None
+                        if host_port:
+                            try:
+                                host_port_int = int(host_port)
+                            except (ValueError, TypeError):
+                                # Invalid port format - keep as None but log the issue
+                                pass
+                        
                         port_mappings.append({
                             "host_ip": host_ip,
-                            "host_port": int(host_port) if host_port else None,
+                            "host_port": host_port_int,
                             "container_port": container_port,
                         })
                 else:
@@ -265,7 +275,7 @@ def containers_ports_probe(containers: List[Container], probe_name: str = "conta
     return evidence
 
 
-def container_inspect_probe(container, probe_name: str = "container_inspect"):
+def container_inspect_probe(container: Container, probe_name: str = "container_inspect"):
     """Get detailed inspection data for a specific container.
     
     Provides comprehensive container information including state, configuration,
@@ -274,8 +284,8 @@ def container_inspect_probe(container, probe_name: str = "container_inspect"):
     Helps answer:
     - Why did a container exit?
     - What's the full error message from a failed container?
-    - What are the container's environment variables?
-    - What image and command is the container using?
+    - What image and labels is the container using?
+    - When did the container start/finish?
     
     Use this when investigating:
     - Container startup failures
