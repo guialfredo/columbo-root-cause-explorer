@@ -187,7 +187,7 @@ dspy.configure(lm=lm)
 
 ### Probe Configuration
 
-Probes can be customized in `probes.py`. Each probe follows this signature:
+Probes are organized in the `probes/` directory by category. Each probe follows this signature:
 
 ```python
 def my_custom_probe(containers, probe_name: str, **kwargs):
@@ -199,7 +199,7 @@ def my_custom_probe(containers, probe_name: str, **kwargs):
     return {"evidence": "..."}
 ```
 
-Register new probes in `probe_registry` and document them in `PROBE_SCHEMAS`.
+Add new probes to the appropriate category file (e.g., `probes/container_probes.py`), register them in `probes/registry.py`, and document them in `PROBE_SCHEMAS`.
 
 ## Example Output
 
@@ -234,7 +234,14 @@ api_tests/
 ├── columbo/
 │   ├── debug_loop.py        # Main debug loop orchestration
 │   ├── modules.py           # DSPy reasoning modules
-│   ├── probes.py            # Diagnostic probe implementations
+│   ├── probes/              # Diagnostic probe implementations
+│   │   ├── __init__.py      # Public API exports
+│   │   ├── container_probes.py  # Container inspection probes
+│   │   ├── volume_probes.py     # Volume inspection probes
+│   │   ├── network_probes.py    # Network connectivity probes
+│   │   ├── config_probes.py     # Config file parsing probes
+│   │   ├── registry.py      # Probe registry and schemas
+│   │   └── utils.py         # Validation and utility functions
 │   ├── schemas.py           # Pydantic data models
 │   └── session_utils.py     # Session persistence and reporting
 ├── debug_sessions/          # Saved debugging sessions and reports
