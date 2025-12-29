@@ -13,6 +13,7 @@ from columbo.modules import (
     EvidenceDigestInput,
 )
 from columbo.probes import probe_registry, PROBE_DEPENDENCIES, build_tools_spec, validate_probe_args, PROBE_SCHEMAS
+from columbo.probes import sanitize_probe_args
 from columbo.schemas import (
     DebugSession,
     ProbeCall,
@@ -176,6 +177,9 @@ def execute_probe(
     # Parse arguments
     args = parse_probe_args(probe_args_str)
     
+    # Sanitize arguments (remove LLM-provided dependencies, normalize aliases)
+    args = sanitize_probe_args(probe_name, args)
+    
     # Resolve dependencies using declarative configuration
     args = resolve_probe_dependencies(probe_name, args, probe_results_cache, workspace_root)
     
@@ -273,6 +277,39 @@ def execute_probe(
                 }
             
             result = probe_func(target_container, command=command, probe_name=probe_name)
+            
+        elif probe_name == "container_mounts":
+            container_name = args.get("container") or args.get("container_name")
+            
+            if not container_name:
+                return {
+                    "error": "Missing container name argument",
+                    "probe_name": probe_name,
+                }
+            
+            # Discover containers on demand
+            containers, _ = container_cache.discover()
+            if not containers:
+                return {
+                    "error": "No containers available or failed to connect to Docker",
+                    "probe_name": probe_name,
+                }
+            
+            # Find the container by name
+            target_container = None
+            for c in containers:
+                if c.name == container_name:
+                    target_container = c
+                    break
+            
+            if not target_container:
+                return {
+                    "error": f"Container '{container_name}' not found",
+                    "available_containers": [c.name for c in containers],
+                    "probe_name": probe_name,
+                }
+            
+            result = probe_func(target_container, probe_name=probe_name)
             
         elif probe_name in ["dns_resolution", "tcp_connection", "http_connection"]:
             # Network probes - pass args directly

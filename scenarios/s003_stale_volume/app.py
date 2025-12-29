@@ -20,18 +20,12 @@ if not SCHEMA_FILE_PATH.exists():
     sys.exit(0)
 
 found_version = SCHEMA_FILE_PATH.read_text().strip()
-print(f"Found existing schema version: {found_version}")
-print(f"Application requires schema version: {EXPECTED_SCHEMA_VERSION}")
 
 if found_version != EXPECTED_SCHEMA_VERSION:
     print("\n" + "!" * 50)
-    print("ERROR: Schema Version Mismatch")
+    print("FATAL: Application initialization failed")
     print("!" * 50)
-    print(f"The persistent data store contains schema version {found_version},")
-    print(f"but this application version requires schema version {EXPECTED_SCHEMA_VERSION}.")
-    print("\nThis typically occurs after upgrading the application without")
-    print("migrating or resetting the persistent storage layer.")
-    print("\nThe application cannot start with incompatible data.")
+    print("Unable to start. Check application logs and configuration.")
     sys.exit(1)
 
 print("Schema validation passed.")
