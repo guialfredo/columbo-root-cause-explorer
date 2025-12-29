@@ -12,7 +12,7 @@
   },
   "budgets": {
     "max_steps": 6,
-    "optimal_steps": 4
+    "optimal_steps": 3
   },
   "initial_evidence": "The RAG agent application won't work. The compose file looks correct and this same setup worked fine yesterday. Something is preventing the services from functioning properly."
 }

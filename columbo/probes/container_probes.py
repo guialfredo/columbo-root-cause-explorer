@@ -39,7 +39,7 @@ def containers_state_probe(containers: List[Container], probe_name: str = "conta
     return evidence
 
 
-def container_logs_probe(container, tail=50, probe_name: str = "container_logs"):
+def container_logs_probe(container: Container, tail=50, probe_name: str = "container_logs"):
     """Retrieve recent logs from a container.
     
     Args:
@@ -75,7 +75,7 @@ def container_logs_probe(container, tail=50, probe_name: str = "container_logs")
 
 
 def container_exec_probe(
-    container,
+    container: Container,
     command: str,
     tail_chars: int = 4000,
     probe_name: str = "container_exec",
@@ -139,7 +139,7 @@ def container_exec_probe(
         }
 
 
-def container_mounts_probe(container, probe_name: str = "container_mounts"):
+def container_mounts_probe(container: Container, probe_name: str = "container_mounts"):
     """Inspect volume and bind mounts attached to a container.
     
     Essential for understanding which volumes a container is using and where they're mounted.
@@ -188,6 +188,141 @@ def container_mounts_probe(container, probe_name: str = "container_mounts"):
             "container": getattr(container, "name", "unknown"),
             "mounts": [],
             "mount_count": 0,
+            "probe_name": probe_name,
+            "error": str(e),
+            "error_type": type(e).__name__,
+        }
+
+
+def containers_ports_probe(containers: List[Container], probe_name: str = "containers_ports"):
+    """Inspect port mappings for all containers to identify which host ports are in use.
+    
+    Critical for diagnosing port conflicts. Shows which containers are binding to host ports
+    and can reveal conflicts where multiple containers attempt to use the same port.
+    
+    Helps answer:
+    - Which container is using port X on the host?
+    - Are there port conflicts preventing services from starting?
+    - What ports are currently occupied by running/stopped containers?
+    
+    Use this when investigating:
+    - Containers failing to start with "address already in use" errors
+    - Services in 'created' state that won't transition to 'running'
+    - Port conflicts between project containers and external containers
+    
+    Args:
+        containers: List of Docker container objects to inspect
+        probe_name: Identifier for this probe execution
+        
+    Returns:
+        list: Port mapping information for each container showing host:container port bindings
+    """
+    evidence = []
+    for container in containers:
+        try:
+            # Get port bindings from container attrs
+            network_settings = container.attrs.get("NetworkSettings", {})
+            ports = network_settings.get("Ports", {})
+            
+            # Parse port mappings into readable format
+            port_mappings = []
+            for container_port, host_bindings in ports.items():
+                if host_bindings:
+                    for binding in host_bindings:
+                        host_ip = binding.get("HostIp", "0.0.0.0")
+                        host_port = binding.get("HostPort")
+                        
+                        # Safely convert host_port to int (probes must never raise exceptions)
+                        host_port_int = None
+                        if host_port:
+                            try:
+                                host_port_int = int(host_port)
+                            except (ValueError, TypeError):
+                                # Invalid port format - keep as None but log the issue
+                                pass
+                        
+                        port_mappings.append({
+                            "host_ip": host_ip,
+                            "host_port": host_port_int,
+                            "container_port": container_port,
+                        })
+                else:
+                    # Port exposed but not published to host
+                    port_mappings.append({
+                        "host_ip": None,
+                        "host_port": None,
+                        "container_port": container_port,
+                        "note": "exposed_not_published"
+                    })
+            
+            evidence.append({
+                "container": container.name,
+                "status": container.status,
+                "port_mappings": port_mappings,
+                "has_host_ports": any(p.get("host_port") is not None for p in port_mappings),
+                "probe_name": probe_name,
+            })
+        except Exception as e:
+            evidence.append({
+                "container": getattr(container, "name", "unknown"),
+                "status": "unknown",
+                "port_mappings": [],
+                "has_host_ports": False,
+                "probe_name": probe_name,
+                "error": str(e),
+                "error_type": type(e).__name__,
+            })
+    return evidence
+
+
+def container_inspect_probe(container: Container, probe_name: str = "container_inspect"):
+    """Get detailed inspection data for a specific container.
+    
+    Provides comprehensive container information including state, configuration,
+    network settings, and runtime details. More detailed than containers_state_probe.
+    
+    Helps answer:
+    - Why did a container exit?
+    - What's the full error message from a failed container?
+    - What image and labels is the container using?
+    - When did the container start/finish?
+    
+    Use this when investigating:
+    - Container startup failures
+    - Configuration issues
+    - Understanding container runtime behavior
+    
+    Args:
+        container: Docker container object to inspect (required)
+        probe_name: Identifier for this probe execution
+        
+    Returns:
+        dict: Comprehensive container details including state, config, ports, labels
+    """
+    try:
+        attrs = container.attrs
+        state = attrs.get("State", {})
+        config = attrs.get("Config", {})
+        network_settings = attrs.get("NetworkSettings", {})
+        
+        return {
+            "container": container.name,
+            "id": container.id[:12],
+            "image": config.get("Image"),
+            "status": state.get("Status"),
+            "running": state.get("Running", False),
+            "exit_code": state.get("ExitCode"),
+            "error": state.get("Error"),
+            "started_at": state.get("StartedAt"),
+            "finished_at": state.get("FinishedAt"),
+            "labels": config.get("Labels", {}),
+            "ports": network_settings.get("Ports", {}),
+            "networks": list(network_settings.get("Networks", {}).keys()),
+            "probe_name": probe_name,
+        }
+    except Exception as e:
+        return {
+            "container": getattr(container, "name", "unknown"),
             "probe_name": probe_name,
             "error": str(e),
             "error_type": type(e).__name__,
