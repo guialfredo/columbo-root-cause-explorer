@@ -246,10 +246,13 @@ def volume_data_inspection_probe(
         temp_container.start()
 
         # List files with human-readable sizes and timestamps to detect staleness
-        exec_log = temp_container.exec_run(
-            f"sh -c 'ls -lh /mnt{sample_path} | head -n {max_items}'"
-        )
-        output = exec_log.output.decode("utf-8", errors="replace")
+        # Use argument list to prevent shell injection via sample_path
+        exec_log = temp_container.exec_run(["ls", "-lh", f"/mnt{sample_path}"])
+        raw_output = exec_log.output.decode("utf-8", errors="replace")
+        
+        # Apply max_items limit in Python instead of shell pipe
+        lines = raw_output.splitlines()
+        output = "\n".join(lines[:max_items]) if max_items > 0 else raw_output
 
         return {
             "volume_name": volume_name,
@@ -322,11 +325,10 @@ def volume_file_read_probe(
         )
         temp_container.start()
 
-        # Check if file exists first
-        check_log = temp_container.exec_run(
-            f"sh -c 'test -f /mnt{file_path} && echo exists || echo missing'"
-        )
-        exists_check = check_log.output.decode("utf-8", errors="replace").strip()
+        # Check if file exists first (use test command with argument list)
+        check_log = temp_container.exec_run(["test", "-f", f"/mnt{file_path}"])
+        # test returns 0 if file exists, non-zero otherwise
+        exists_check = "exists" if check_log.exit_code == 0 else "missing"
         
         if exists_check != "exists":
             return {
@@ -338,16 +340,14 @@ def volume_file_read_probe(
                 "probe_name": probe_name,
             }
 
-        # Get file size
-        size_log = temp_container.exec_run(
-            f"sh -c 'wc -c < /mnt{file_path}'"
-        )
-        file_size = int(size_log.output.decode("utf-8", errors="replace").strip())
+        # Get file size using argument list to prevent shell injection
+        size_log = temp_container.exec_run(["wc", "-c", f"/mnt{file_path}"])
+        # wc outputs "count filename", extract just the count
+        size_output = size_log.output.decode("utf-8", errors="replace").strip()
+        file_size = int(size_output.split()[0])
 
-        # Read file contents (with size limit)
-        exec_log = temp_container.exec_run(
-            f"sh -c 'head -c {max_bytes} /mnt{file_path}'"
-        )
+        # Read file contents (with size limit) using argument list
+        exec_log = temp_container.exec_run(["head", "-c", str(max_bytes), f"/mnt{file_path}"])
         contents = exec_log.output.decode("utf-8", errors="replace")
         
         truncated = file_size > max_bytes
