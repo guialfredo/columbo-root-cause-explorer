@@ -203,6 +203,49 @@ def execute_probe(
                     "probe_name": probe_name
                 }
             result = probe_func(containers, probe_name=probe_name)
+        
+        elif probe_name == "containers_ports":
+            # Discover containers on demand for port inspection
+            containers, _ = container_cache.discover()
+            if not containers:
+                return {
+                    "error": "No containers available or failed to connect to Docker",
+                    "probe_name": probe_name
+                }
+            result = probe_func(containers, probe_name=probe_name)
+        
+        elif probe_name == "container_inspect":
+            container_name = args.get("container") or args.get("container_name")
+            
+            if not container_name:
+                return {
+                    "error": "Missing container name argument",
+                    "probe_name": probe_name,
+                }
+            
+            # Discover containers on demand
+            containers, _ = container_cache.discover()
+            if not containers:
+                return {
+                    "error": "No containers available or failed to connect to Docker",
+                    "probe_name": probe_name,
+                }
+            
+            # Find the container by name
+            target_container = None
+            for c in containers:
+                if c.name == container_name:
+                    target_container = c
+                    break
+            
+            if not target_container:
+                return {
+                    "error": f"Container '{container_name}' not found",
+                    "available_containers": [c.name for c in containers],
+                    "probe_name": probe_name,
+                }
+            
+            result = probe_func(target_container, probe_name=probe_name)
             
         elif probe_name == "container_logs":
             container_name = args.get("container") or args.get("container_name")

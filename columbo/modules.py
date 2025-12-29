@@ -84,6 +84,13 @@ Special rules for data/volume issues:
   * Knowing a volume is mounted is NOT sufficient - you must inspect what's inside it
 - Example: If code checks /data/version.txt, you need the actual contents of that file, not just inference from logs
 
+Special rules for port conflict issues:
+- If error messages mention "port already allocated", "address already in use", "bind failed", or similar:
+  * You MUST identify which specific container is occupying the conflicting port
+  * Knowing "port X is unavailable" is NOT sufficient - you need the blocker's identity
+  * Use port inspection probes to see all container port bindings
+- Do NOT stop if the recommended fix involves manual host investigation (lsof, netstat, etc) - this means you haven't found the blocker yet
+
 Stop criteria (should_stop='yes') require ALL of:
 1) Root cause is proven (direct evidence, not inference).
 2) The failure path is explained end-to-end (why this causes the observed error).
