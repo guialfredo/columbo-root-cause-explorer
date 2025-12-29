@@ -33,6 +33,7 @@ from columbo.session_utils import (
     save_session_to_file,
     generate_session_report,
 )
+from columbo.ui import ColumboUI
 
 
 def setup_dspy_llm(api_key: str):
@@ -93,6 +94,11 @@ def main():
         type=Path,
         default=Path("evaluation_results"),
         help="Directory to save evaluation results"
+    )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Enable interactive Rich UI for live investigation updates"
     )
     
     args = parser.parse_args()
@@ -174,15 +180,26 @@ def main():
     
     print(f"\nInitial Evidence:\n{initial_evidence}\n")
     
+    # Initialize UI if interactive mode
+    ui = None
+    if args.interactive:
+        ui = ColumboUI(max_steps=manifest.budgets['max_steps'])
+        ui.start()
+    
     try:
         result = debug_loop(
             initial_evidence=initial_evidence,
             max_steps=manifest.budgets['max_steps'],
             workspace_root=str(scenario_ref.scenario_dir),
+            ui_callback=ui,
         )
         
         diagnosis = result["diagnosis"]
         session_model = result["session_model"]
+        
+        # Stop UI if interactive
+        if ui:
+            ui.stop()
         
     except Exception as e:
         print(f"ERROR during debugging: {e}")

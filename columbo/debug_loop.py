@@ -395,14 +395,20 @@ def format_probe_result(result) -> str:
         return str(result)
 
 
-def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optional[str] = None):
-    """Main debugging loop that iterates through hypothesis generation,
+def debug_loop(
+    initial_evidence: str, 
+    max_steps: int = 10, 
+    workspace_root: Optional[str] = None,
+    ui_callback: Optional[Any] = None
+) -> dict:
+    """Main debugging loop with hypothesis generation, probing,
     probe planning, execution, and evidence digestion.
     
     Args:
         initial_evidence: Initial problem description or error message
         max_steps: Maximum number of probing steps (default 10)
         workspace_root: Root path of the workspace for file operations
+        ui_callback: Optional UI handler for live updates (e.g., ColumboUI instance)
         
     Returns:
         dict: Final debugging results including evidence, hypotheses, and probes executed
@@ -436,9 +442,16 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
         print(f"Step {step + 1}/{max_steps}")
         print(f"{'='*60}")
         
+        # Update UI - new step
+        if ui_callback:
+            ui_callback.update_step(step + 1)
+        
         try:
             # Generate hypotheses
             print("\nGenerating hypotheses...")
+            if ui_callback:
+                ui_callback.update_activity("Generating hypotheses...")
+            
             evidence_input = EvidenceInput(evidence=evidence)
             hypotheses_result = hypothesis_gen(evidence_input=evidence_input)
             hypotheses = hypotheses_result.hypotheses_output.hypotheses
@@ -447,8 +460,38 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
             print(f"\nHypotheses:\n{hypotheses}")
             print(f"\nKey unknowns:\n{key_unknowns}")
             
+            # Parse and send hypotheses to UI
+            if ui_callback:
+                # Parse the hypotheses string into structured data
+                hypothesis_list = []
+                for line in hypotheses.split('\n'):
+                    line = line.strip()
+                    if line and (line.startswith('H') or line.startswith('-')):
+                        # Try to extract hypothesis parts
+                        parts = line.split('|')
+                        desc = parts[0].strip()
+                        conf = "medium"
+                        reason = ""
+                        
+                        for part in parts[1:]:
+                            if 'confidence:' in part.lower():
+                                conf = part.split(':')[1].strip()
+                            elif 'why:' in part.lower():
+                                reason = part.split(':')[1].strip()
+                        
+                        hypothesis_list.append({
+                            "description": desc,
+                            "confidence": conf,
+                            "reasoning": reason
+                        })
+                
+                ui_callback.update_hypotheses(hypothesis_list)
+            
             # Plan next probe
             print("\nPlanning next probe...")
+            if ui_callback:
+                ui_callback.update_activity("Planning diagnostic probe...")
+            
             tools_spec = build_tools_spec()
             planning_input = ProbePlanningInput(
                 evidence=evidence,
@@ -486,6 +529,9 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
             
             # Execute probe
             print(f"\nExecuting probe '{probe_name}'...")
+            if ui_callback:
+                ui_callback.update_activity(f"Executing: {probe_name}")
+            
             probe_start = datetime.utcnow()
             
             raw_probe_result = execute_probe(
@@ -522,6 +568,11 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
             session.probe_history.append(probe_call)
             session.current_step = step + 1
             
+            # Update UI with probe execution
+            if ui_callback:
+                success = probe_call.error is None
+                ui_callback.add_probe_execution(step + 1, probe_name, success)
+            
             probe_result_str = format_probe_result(raw_probe_result)
             print(f"\nProbe result:\n{probe_result_str[:500]}...")
             if probe_call.duration_seconds:
@@ -529,6 +580,8 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
             
             # Digest evidence - create a compact summary of this probe's findings
             print("\nDigesting evidence...")
+            if ui_callback:
+                ui_callback.update_activity("Digesting evidence...")
             prior_evidence_text = "\n".join(evidence_log)
             digest_input = EvidenceDigestInput(
                 raw_probe_result=probe_result_str,
@@ -551,6 +604,13 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
             evidence_log.append(finding_entry)
             
             print(f"\nNew finding:\n{new_info}")
+            
+            # Update UI with latest finding
+            if ui_callback:
+                ui_callback.update_finding({
+                    "summary": new_info[:200],
+                    "significance": expected_signal[:100] if expected_signal else "N/A"
+                })
             
             # Reconstruct full evidence from initial problem + all findings
             all_findings = "\n\n".join(evidence_log)
@@ -580,6 +640,9 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
             
             # Agent-driven stopping decision
             print(f"\nEvaluating whether to stop debugging...")
+            if ui_callback:
+                ui_callback.update_activity("Evaluating confidence...")
+            
             stop_result = stop_decider(
                 evidence=evidence,
                 hypotheses=hypotheses,
@@ -597,6 +660,10 @@ def debug_loop(initial_evidence: str, max_steps: int = 10, workspace_root: Optio
             print(f"Stop decision: {stop_decision.should_stop}")
             print(f"Confidence: {stop_decision.confidence}")
             print(f"Reasoning: {stop_decision.reasoning}")
+            
+            # Update UI with confidence level
+            if ui_callback:
+                ui_callback.update_confidence(stop_decision.confidence)
             
             if should_stop:
                 print("\n✓ Agent decided to stop debugging!")
