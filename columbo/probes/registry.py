@@ -5,6 +5,8 @@ from .container_probes import (
     container_logs_probe,
     container_exec_probe,
     container_mounts_probe,
+    containers_ports_probe,
+    container_inspect_probe,
 )
 from .volume_probes import (
     list_volumes_probe,
@@ -30,6 +32,8 @@ probe_registry = {
     "containers_state": containers_state_probe,
     "container_logs": container_logs_probe,
     "container_exec": container_exec_probe,
+    "containers_ports": containers_ports_probe,
+    "container_inspect": container_inspect_probe,
     "dns_resolution": dns_resolution_probe,
     "tcp_connection": tcp_connection_probe,
     "http_connection": http_connection_probe,
@@ -52,6 +56,20 @@ PROBE_SCHEMAS = {
         "args": {},
         "required_args": set(),
         "example": "{}",
+    },
+    "containers_ports": {
+        "description": "Show port mappings for all containers. Critical for identifying port conflicts - reveals which containers are binding to host ports, including containers outside the current project.",
+        "args": {},
+        "required_args": set(),
+        "example": "{}",
+    },
+    "container_inspect": {
+        "description": "Get detailed inspection data for a specific container including state, exit code, error messages, labels, and configuration.",
+        "args": {
+            "container": "Name of the container to inspect (required)",
+        },
+        "required_args": {"container"},
+        "example": '{"container": "data_processor_dev"}',
     },
     "container_logs": {
         "description": "Retrieve logs from a specific container",
