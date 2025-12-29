@@ -23,9 +23,9 @@ found_version = SCHEMA_FILE_PATH.read_text().strip()
 
 if found_version != EXPECTED_SCHEMA_VERSION:
     print("\n" + "!" * 50)
-    print("FATAL: Application initialization failed")
+    print("FATAL: Schema version mismatch!")
     print("!" * 50)
-    print("Unable to start. Check application logs and configuration.")
+    print(f"Expected schema version: {EXPECTED_SCHEMA_VERSION}")
     sys.exit(1)
 
 print("Schema validation passed.")
