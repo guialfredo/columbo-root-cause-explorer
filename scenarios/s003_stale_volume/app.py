@@ -20,15 +20,12 @@ if not SCHEMA_FILE_PATH.exists():
     sys.exit(0)
 
 found_version = SCHEMA_FILE_PATH.read_text().strip()
-print(f"Validating data store compatibility...")
 
 if found_version != EXPECTED_SCHEMA_VERSION:
     print("\n" + "!" * 50)
-    print("FATAL ERROR: Data store validation failed")
+    print("FATAL: Application initialization failed")
     print("!" * 50)
-    print("The persistent data store is in an incompatible state.")
-    print("Cannot proceed with application startup.")
-    print("\nPlease check logs and data integrity.")
+    print("Unable to start. Check application logs and configuration.")
     sys.exit(1)
 
 print("Schema validation passed.")

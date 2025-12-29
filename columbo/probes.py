@@ -862,7 +862,7 @@ PROBE_SCHEMAS = {
         "example": "{}",
     },
     "docker_compose_parsing": {
-        "description": "Parse docker-compose files to extract service definitions. Auto-discovers config files if needed.",
+        "description": "Parse docker-compose files to extract service definitions. Auto-discovers config files if needed. Note: Volume names are logical and may differ from actual Docker volume names.",
         "args": {
             "found_files": "Optional: list from config_files_detection. Will auto-discover if not provided.",
         },
@@ -884,7 +884,7 @@ PROBE_SCHEMAS = {
         "example": "{}",
     },
     "volume_metadata": {
-        "description": "Retrieve volume metadata including creation time, labels, driver, and mountpoint. Critical for detecting stale volumes.",
+        "description": "Retrieve volume metadata including creation time, labels, driver, and mountpoint. Critical for detecting stale volumes. Requires actual Docker volume name.",
         "args": {
             "volume_name": "Name of the volume to inspect (required)",
         },
@@ -892,7 +892,7 @@ PROBE_SCHEMAS = {
         "example": '{"volume_name": "s003_data"}',
     },
     "container_mounts": {
-        "description": "Show which volumes and bind mounts are attached to a container, including mount paths and read/write status.",
+        "description": "Show which volumes and bind mounts are attached to a container, including mount paths and read/write status. Returns actual Docker volume names in Source field, which may include project prefixes.",
         "args": {
             "container": "Name of the container to inspect (required)",
         },
@@ -900,7 +900,7 @@ PROBE_SCHEMAS = {
         "example": '{"container": "s003_app"}',
     },
     "volume_data_inspection": {
-        "description": "List files in a volume directory using a temporary read-only container. Shows file sizes and modification times.",
+        "description": "List files in a volume directory using a temporary read-only container. Shows file sizes and modification times. Requires actual Docker volume name.",
         "args": {
             "volume_name": "Name of the volume to inspect (required)",
             "sample_path": "Path within the volume to list (default: /)",
@@ -910,7 +910,7 @@ PROBE_SCHEMAS = {
         "example": '{"volume_name": "s003_data", "sample_path": "/", "max_items": 20}',
     },
     "volume_file_read": {
-        "description": "Read the contents of a specific file from a volume using a temporary read-only container. More constrained than container_exec for file reading.",
+        "description": "Read the contents of a specific file from a volume using a temporary read-only container. More constrained than container_exec for file reading. Requires actual Docker volume name.",
         "args": {
             "volume_name": "Name of the volume containing the file (required)",
             "file_path": "Path to the file within the volume, e.g., /schema_version.txt (required)",

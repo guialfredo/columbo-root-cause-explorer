@@ -77,10 +77,18 @@ Grounding rules:
 - If the top hypothesis mentions a specific artifact (e.g., /app/config/environment.yml, Dockerfile ENV, config loader),
   you must have direct evidence from that artifact (e.g., file content, inspect output, code snippet) before stopping.
 
+Special rules for data/volume issues:
+- If hypotheses mention "stale data", "incompatible volume", "schema mismatch", "persistent state", or similar:
+  * You MUST have actual file contents from the volume (via volume_file_read or volume_data_inspection)
+  * Reading source code that validates data is NOT sufficient - you need the actual data values
+  * Knowing a volume is mounted is NOT sufficient - you must inspect what's inside it
+- Example: If code checks /data/version.txt, you need the actual contents of that file, not just inference from logs
+
 Stop criteria (should_stop='yes') require ALL of:
 1) Root cause is proven (direct evidence, not inference).
 2) The failure path is explained end-to-end (why this causes the observed error).
 3) A fix can be proposed without guessing (no critical missing evidence).
+4) For volume/data issues: actual data values have been inspected, not just inferred.
 
 If steps_remaining is small, prioritize the single most discriminating missing piece of evidence.
 Output format rules:

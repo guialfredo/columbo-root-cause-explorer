@@ -11,5 +11,5 @@
     "max_steps": 8,
     "optimal_steps": 4
   },
-  "initial_evidence": "My container fails after I updated the app. I rebuilt the image but it still crashes immediately.\n\nError mentions incompatible state / schema version.\n\nI’m using docker compose."
+  "initial_evidence": "My application won't start after I updated the code. I rebuilt the image with --no-cache but the service still fails to initialize.\n\nThe container appears to be running but the application isn't working.\n\nI'm using docker compose."
 }
