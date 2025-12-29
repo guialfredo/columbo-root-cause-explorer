@@ -80,9 +80,11 @@ Grounding rules:
 Special rules for data/volume issues:
 - If hypotheses mention "stale data", "incompatible volume", "schema mismatch", "persistent state", or similar:
   * You MUST have actual file contents from the volume (via volume_file_read or volume_data_inspection)
+  * The evidence MUST include the file_contents field with the actual data values
+  * Seeing only "file exists" or "file size" or "No file contents captured" is NOT sufficient
   * Reading source code that validates data is NOT sufficient - you need the actual data values
   * Knowing a volume is mounted is NOT sufficient - you must inspect what's inside it
-- Example: If code checks /data/version.txt, you need the actual contents of that file, not just inference from logs
+  * Do NOT infer volume contents from error messages - you must read the file directly
 
 Special rules for port conflict issues:
 - If error messages mention "port already allocated", "address already in use", "bind failed", or similar:
