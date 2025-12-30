@@ -26,6 +26,7 @@ class ColumboUI:
         self.latest_finding = None
         self.probe_history: List[Dict[str, Any]] = []
         self.confidence = "unknown"
+        self.current_probe_plan = None  # Store current probe plan details
         
         # Progress tracking
         self.progress = Progress(
@@ -86,6 +87,21 @@ class ColumboUI:
         inv_content = []
         inv_content.append(f"[bold]Step {self.current_step}/{self.max_steps}[/bold]")
         inv_content.append(f"[yellow]⚙ {self.current_activity}[/yellow]")
+        
+        # Show current probe plan if available
+        if self.current_probe_plan:
+            inv_content.append("")
+            inv_content.append(f"[bold magenta]📋 Next Probe:[/bold magenta]")
+            inv_content.append(f"  [cyan]{self.current_probe_plan['name']}[/cyan]")
+            args_str = str(self.current_probe_plan.get('args', ''))
+            if len(args_str) > 60:
+                args_str = args_str[:57] + "..."
+            inv_content.append(f"  [dim]Args: {args_str}[/dim]")
+            if self.current_probe_plan.get('expected'):
+                exp = self.current_probe_plan['expected']
+                if len(exp) > 60:
+                    exp = exp[:57] + "..."
+                inv_content.append(f"  [dim]Expecting: {exp}[/dim]")
         
         if self.hypotheses:
             inv_content.append("")
@@ -202,6 +218,16 @@ class ColumboUI:
     def update_hypotheses(self, hypotheses: List[Dict[str, Any]]):
         """Update all active hypotheses."""
         self.hypotheses = hypotheses
+        if self.live:
+            self.live.update(self.render())
+    
+    def update_probe_plan(self, probe_name: str, probe_args: str, expected_signal: str):
+        """Update the current probe plan being executed."""
+        self.current_probe_plan = {
+            "name": probe_name,
+            "args": probe_args,
+            "expected": expected_signal
+        }
         if self.live:
             self.live.update(self.render())
     
