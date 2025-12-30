@@ -1,0 +1,19 @@
+{
+  "scenario_id": "s005_permission_denied",
+  "title": "Volume Permission Mismatch - UID/GID Conflict",
+  "difficulty": "hard",
+  "category": "permission",
+  "grading": {
+    "expected_root_cause_id": "PERMISSION_DENIED_UID_GID_CONFLICT",
+    "proof_requirements": [
+      "identified_permission_denied_error",
+      "analyzed_volume_mounts",
+      "checked_container_user_ids"
+    ]
+  },
+  "budgets": {
+    "max_steps": 10,
+    "optimal_steps": 8
+  },
+  "initial_evidence": "When trying docker compose up, Container starts successfully, Logs show: \"Data pipeline initialized ✓\" Then:  \"ERROR: Failed to save checkpoint: Permission denied\" Container keeps restarting"
+}
