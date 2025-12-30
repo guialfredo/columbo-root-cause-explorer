@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VOLUME_NAME="s005_permission_denied_s005_data"
+# Use COMPOSE_PROJECT_NAME from environment if available, otherwise fallback to static name
+# This ensures volume name matches what docker-compose will create
+if [ -n "${COMPOSE_PROJECT_NAME:-}" ]; then
+  VOLUME_NAME="${COMPOSE_PROJECT_NAME}_s005_data"
+else
+  VOLUME_NAME="s005_permission_denied_s005_data"
+fi
 
 echo "Setting up volume with initial data..."
+echo "Volume name: $VOLUME_NAME"
 
 # Create volume if it doesn't exist
 docker volume create "$VOLUME_NAME" >/dev/null 2>&1 || true

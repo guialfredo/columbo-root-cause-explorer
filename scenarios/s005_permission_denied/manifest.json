@@ -1,14 +1,16 @@
 {
   "scenario_id": "s005_permission_denied",
   "title": "Volume Permission Mismatch - UID/GID Conflict",
-  "difficulty": "hard",
+  "difficulty": "medium",
   "category": "permission",
   "grading": {
     "expected_root_cause_id": "PERMISSION_DENIED_UID_GID_CONFLICT",
     "proof_requirements": [
       "identified_permission_denied_error",
+      "checked_container_logs", 
       "analyzed_volume_mounts",
-      "checked_container_user_ids"
+      "checked_container_user_ids",
+      "inspected_failing_directory_permissions"
     ]
   },
   "budgets": {

@@ -14,7 +14,7 @@ Each scenario includes the necessary infrastructure files (docker-compose, manif
 | s002 | Image Not Rebuilt | 🟡 Medium | API Client, Mock API | Build Cache | Build argument changed in `.env` file but image not rebuilt, causing service to use stale endpoint |
 | s003 | Stale Volume State | 🟡 Medium | Single App | Persistent State | Named Docker volume contains incompatible schema version from previous deployment, causing immediate crash despite correct image rebuild |
 | s004 | Port Blocker | 🟢 Easy | RAG Agent, Qdrant | Networking | Leftover container from previous session occupies port 6333, preventing Qdrant from starting and blocking entire stack |
-| s005 | Permission Denied | 🔴 Hard | Worker | Permissions | Volume seeded by setup script (UID 0) conflicts with non-root container user (UID 1000), causing write permission failures on checkpoint directory |
+| s005 | Permission Denied | 🔴 Medium | Worker | Permissions | Volume seeded by setup script (UID 0) conflicts with non-root container user (UID 1000), causing write permission failures on checkpoint directory |
 
 ### Difficulty Levels
 - 🟢 **Easy**: Single service, straightforward issue
