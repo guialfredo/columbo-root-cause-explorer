@@ -505,6 +505,12 @@ def debug_loop(
             expected_signal = probe_plan_result.probe_plan.expected_signal
             stop_condition = probe_plan_result.probe_plan.stop_if
             
+            # Update UI with probe selection
+            if ui_callback:
+                args_preview = str(probe_args)[:50] + "..." if len(str(probe_args)) > 50 else str(probe_args)
+                ui_callback.update_activity(f"Selected probe: {probe_name}")
+                ui_callback.update_probe_plan(probe_name, probe_args, expected_signal)
+            
             # Check if this exact probe+args combination has been executed before
             # Create temporary ProbeCall to compute signature
             temp_probe = ProbeCall(
@@ -661,9 +667,13 @@ def debug_loop(
             print(f"Confidence: {stop_decision.confidence}")
             print(f"Reasoning: {stop_decision.reasoning}")
             
-            # Update UI with confidence level
+            # Update UI with stop decision
             if ui_callback:
                 ui_callback.update_confidence(stop_decision.confidence)
+                if should_stop:
+                    ui_callback.update_activity(f"✓ Stopping: {stop_decision.reasoning[:60]}...")
+                else:
+                    ui_callback.update_activity(f"Continuing investigation...")
             
             if should_stop:
                 print("\n✓ Agent decided to stop debugging!")
