@@ -100,3 +100,7 @@ A data processing pipeline fails with cryptic "Permission denied" errors when wr
 4. **Identify mismatch**: UID 1000 (container) vs UID 0 (volume files)
 5. **Trace volume creation**: Find setup.sh that seeded volume as root
 6. **Formulate root cause**: Volume initialized with wrong ownership for container user
+
+## Design Notes
+
+**Exception Handling**: The `save_checkpoint()` function intentionally uses broad `except Exception` rather than specific `PermissionError` handling. This simulates real-world code where developers often use generic exception handling that masks the specific nature of errors, making the debugging scenario more challenging and realistic.

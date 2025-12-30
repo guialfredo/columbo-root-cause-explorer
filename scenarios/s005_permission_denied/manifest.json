@@ -2,7 +2,7 @@
   "scenario_id": "s005_permission_denied",
   "title": "Volume Permission Mismatch - UID/GID Conflict",
   "difficulty": "hard",
-  "category": "Permission Issues",
+  "category": "permission",
   "grading": {
     "expected_root_cause_id": "PERMISSION_DENIED_UID_GID_CONFLICT",
     "proof_requirements": [
