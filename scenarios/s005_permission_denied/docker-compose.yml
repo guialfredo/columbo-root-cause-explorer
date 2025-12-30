@@ -1,0 +1,12 @@
+services:
+  worker:
+    build: 
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: s005_worker
+    volumes:
+      - s005_data:/data
+    command: ["sh", "-c", "python app.py || (echo 'Worker failed.  Container will remain running for debugging... '; sleep infinity)"]
+
+volumes:
+  s005_data:
