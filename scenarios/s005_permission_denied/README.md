@@ -1,82 +1,102 @@
-Volume Permission Mismatch - UID/GID Conflict
+# Volume Permission Mismatch - UID/GID Conflict
 
-A data processing pipeline fails with cryptic "Permission denied" errors when writing to a mounted volume. The container runs as a non-root user (good security practice! ), but the volume was created by a different setup script running as a different UID. Logs show successful initialization, but writes silently fail or crash the app.
+A data processing pipeline fails with cryptic "Permission denied" errors when writing to a mounted volume. The container runs as a non-root user (security best practice), but the volume was seeded by a setup script running as root. Logs show successful initialization, but writes fail with permission errors.
 
-Root Cause Layers:
+## Scenario Overview
 
-Layer 1: Volume Ownership Mismatch
+**Symptom**: Container starts successfully and reads configuration, but crashes when attempting to write checkpoint files.
 
-A setup.sh script pre-seeds the volume using Alpine (runs as root, UID 0)
-Creates /data/config/settings.json owned by root:root (UID 0, GID 0)
-Creates /data/checkpoints/ directory owned by root:root
-Layer 2: Container User Context
+**Deceptive Element**: The app appears to initialize correctly because it can *read* the config file (world-readable), masking the underlying permission issue that only surfaces on write attempts.
 
-worker container runs as USER appuser (UID 1000, GID 1000) in Dockerfile
-This is a security best practice (non-root containers)
-But volume files are owned by UID 0
-Layer 3: Misleading Permissions
+## Root Cause Layers
 
-/data/config/settings.json is world-readable (644), so app can READ it ✓
-/data/checkpoints/ directory has drwxr-xr-x (755), so app can LIST it ✓
-But app cannot WRITE to /data/checkpoints/ (needs write permission)
-Logs say "Initialized successfully" because read-only checks pass
-Layer 4: Partial Failure
+### Layer 1: Volume Ownership Mismatch
 
-App reads config successfully, starts processing
-After processing batch 1, tries to write checkpoint → Permission denied
-Retry logic kicks in, reads config again → Works!
-Processes batch 2, tries to write → Permission denied again
-Looks intermittent, but it's actually consistent write failure
+- `setup.sh` pre-seeds the volume using Alpine (runs as root, UID 0)
+- Creates `/data/config/settings.json` owned by `root:root` (UID 0, GID 0)
+- Creates `/data/checkpoints/` directory owned by `root:root`
 
+### Layer 2: Container User Context
 
+- Worker container runs as `USER appuser` (UID 1000, GID 1000) via Dockerfile
+- This follows security best practices (non-root containers)
+- However, volume files remain owned by UID 0
+
+### Layer 3: Misleading Permissions
+
+- `/data/config/settings.json` is world-readable (644) → app can READ it ✓
+- `/data/checkpoints/` has `drwxr-xr-x` (755) → app can LIST it ✓
+- But app **cannot WRITE** to `/data/checkpoints/` (no write permission for other)
+- Logs report "Initialized successfully" because read-only checks pass
+
+### Layer 4: Partial Failure Pattern
+
+1. App reads config successfully → starts processing
+2. After processing batch, tries to write checkpoint → **Permission denied**
+3. Container crashes and restarts (or hangs with error message)
+
+## Architecture Diagram
+
+```
 ┌─────────────────────────────────────────────────┐
-│  setup.sh (runs before docker-compose up)        │
-│                                                  │
-│  Command:                                         │
-│    docker run --rm -v s005_data:/data alpine \  │
-│      sh -c "mkdir -p /data/config /data/checkpoints && \
-│              echo '{}' > /data/config/settings.json"│
-│                                                  │
-│  Runs as:  root (UID 0, GID 0)                   │
-│                                                  │
-│  Creates:                                        │
-│    /data/config/settings.json (0: 0, 644)        │
-│    /data/checkpoints/          (0:0, 755)       │
+│  setup.sh (runs before docker-compose up)       │
+│                                                 │
+│  $ docker run --rm \                            │
+│      -v s005_permission_denied_s005_data:/data \ │
+│      alpine:3.20 sh -c '...'                    │
+│                                                 │
+│  Runs as:  root (UID 0, GID 0)                  │
+│                                                 │
+│  Creates:                                       │
+│    /data/config/settings.json  (0:0, 644)      │
+│    /data/checkpoints/          (0:0, 755)      │
 └─────────────────────────────────────────────────┘
                     │
-                    │ Volume mount
+                    │ Volume persists
                     ▼
 ┌─────────────────────────────────────────────────┐
-│  Named Docker Volume:  s005_data                  │
-│                                                  │
-│  /data/config/settings.json                      │
+│  Named Docker Volume:                           │
+│    s005_permission_denied_s005_data             │
+│                                                 │
+│  /data/config/settings.json                     │
 │    Owner: UID 0, GID 0 (root)                   │
 │    Permissions: 644 (rw-r--r--)                 │
-│                                                  │
-│  /data/checkpoints/                              │
+│                                                 │
+│  /data/checkpoints/                             │
 │    Owner: UID 0, GID 0 (root)                   │
 │    Permissions: 755 (rwxr-xr-x)                 │
 └─────────────────────────────────────────────────┘
                     │
-                    │ Volume mount
+                    │ Mounted by compose
                     ▼
 ┌─────────────────────────────────────────────────┐
-│  worker container                                │
-│                                                  │
-│  Dockerfile:  USER appuser                        │
+│  worker container (s005_worker)                 │
+│                                                 │
+│  Dockerfile:  USER appuser                      │
 │  Runtime UID: 1000, GID: 1000                   │
-│                                                  │
-│  Read attempt:                                    │
+│                                                 │
+│  Read attempt:                                  │
 │    /data/config/settings.json → SUCCESS ✓       │
-│    (world-readable)                              │
-│                                                  │
-│  Write attempt:                                  │
+│    (world-readable, 644)                        │
+│                                                 │
+│  Write attempt:                                 │
 │    /data/checkpoints/state.json → FAIL ✗        │
 │    Error: [Errno 13] Permission denied          │
-│                                                  │
-│  Logs:                                           │
-│    "Pipeline initialized ✓"  (misleading)       │
-│    "Processing batch 1..."                       │
-│    "ERROR: Cannot save checkpoint"               │
+│                                                 │
+│  Logs:                                          │
+│    "✓ Config loaded from /data/config/..."      │
+│    "✓ Data pipeline initialized"                │
+│    "Processing batch 1..."                      │
+│    "✗ ERROR: Failed to save checkpoint"         │
+│    "  [Errno 13] Permission denied: ..."        │
 └─────────────────────────────────────────────────┘
+```
 
+## Expected Debug Path
+
+1. **Observe symptoms**: Container logs show permission denied errors
+2. **Inspect container user**: Check what UID the container runs as
+3. **Examine volume permissions**: List files in the volume with ownership details
+4. **Identify mismatch**: UID 1000 (container) vs UID 0 (volume files)
+5. **Trace volume creation**: Find setup.sh that seeded volume as root
+6. **Formulate root cause**: Volume initialized with wrong ownership for container user
