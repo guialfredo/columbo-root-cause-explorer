@@ -296,3 +296,97 @@ def volume_file_read_probe(
                 temp_container.remove()
             except Exception:
                 pass  # Best effort cleanup
+
+
+def inspect_volume_file_permissions(
+    volume_name: str,
+    path_in_volume: str = "/",
+    probe_name: str = "inspect_volume_file_permissions",
+):
+    """Inspect file ownership and permissions within a Docker volume.
+    
+    Creates a temporary read-only Alpine container to examine the UID/GID
+    ownership and permission bits of files/directories in a volume.
+    
+    Critical for diagnosing permission-related issues like:
+    - Volume files owned by root (UID 0) but container runs as non-root user
+    - Mismatched UID/GID between volume initialization and runtime
+    - Write permission denied on directories that appear accessible
+    
+    Uses `ls -ln` to show numeric UIDs/GIDs rather than symbolic names,
+    which is essential for cross-container permission analysis.
+    
+    IMPORTANT: The volume is mounted at its root. If a container mounts the volume
+    at /data, you should use path_in_volume="/" to see the volume root contents,
+    or path_in_volume="/subdir" to see a subdirectory within the volume.
+    
+    Args:
+        volume_name: Name of the volume to inspect (required)
+        path_in_volume: Path within the volume root to inspect (default: "/" for root).
+                       Use "/" to see volume root, "/config" for config subdir, etc.
+        probe_name: Identifier for this probe execution
+        
+    Returns:
+        dict: Contains permissions_listing with detailed ownership info (UID, GID, perms).
+              Returns None for permissions_listing on error.
+    """
+    temp_container = None
+    try:
+        import docker
+
+        client = docker.from_env()
+        
+        # Ensure alpine image is available locally
+        image_name = "alpine:latest"
+        try:
+            client.images.pull(image_name)
+        except Exception as pull_error:
+            return {
+                "volume_name": volume_name,
+                "path_in_volume": path_in_volume,
+                "permissions_listing": None,
+                "probe_name": probe_name,
+                "error": f"Failed to pull {image_name}: {str(pull_error)}",
+                "error_type": "image_pull_error",
+            }
+        
+        volume = client.volumes.get(volume_name)
+
+        # Create a temporary container to inspect permissions
+        temp_container = client.containers.create(
+            image=image_name,
+            command="sleep 10",
+            volumes={volume.name: {"bind": "/mnt", "mode": "ro"}},
+        )
+        temp_container.start()
+
+        # Use ls -ln to show numeric UIDs/GIDs (critical for permission diagnosis)
+        # -l: long format, -n: numeric IDs, -a: show hidden files
+        exec_log = temp_container.exec_run(["ls", "-lna", f"/mnt{path_in_volume}"])
+        permissions_output = exec_log.output.decode("utf-8", errors="replace")
+
+        return {
+            "volume_name": volume_name,
+            "path_in_volume": path_in_volume,
+            "permissions_listing": permissions_output,
+            "probe_name": probe_name,
+        }
+    except Exception as e:
+        return {
+            "volume_name": volume_name,
+            "path_in_volume": path_in_volume,
+            "permissions_listing": None,
+            "probe_name": probe_name,
+            "error": str(e),
+            "error_type": type(e).__name__,
+        }
+    finally:
+        # Ensure cleanup even on error
+        if temp_container:
+            try:
+                temp_container.stop(timeout=1)
+                temp_container.remove()
+            except Exception:
+                pass  # Best effort cleanup
+
+
