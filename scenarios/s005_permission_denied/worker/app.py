@@ -1,6 +1,5 @@
 import json
 import time
-import os
 from pathlib import Path
 
 CONFIG_PATH = Path("/data/config/settings.json")
@@ -16,13 +15,13 @@ def load_config():
     
     try:
         config = json.loads(CONFIG_PATH.read_text())
-        print(f"✓ Config loaded:  {config}")
+        print(f"✓ Config loaded: {config}")
         return config
     except PermissionError as e:
         print(f"✗ Permission denied reading config: {e}")
         exit(1)
 
-def save_checkpoint(batch_num:  int):
+def save_checkpoint(batch_num: int):
     """Save checkpoint to volume."""
     checkpoint_file = CHECKPOINT_DIR / f"checkpoint_{batch_num}.json"
     
@@ -30,7 +29,7 @@ def save_checkpoint(batch_num:  int):
     
     try:
         checkpoint_data = {
-            "batch":  batch_num,
+            "batch": batch_num,
             "timestamp": time.time(),
             "status": "completed"
         }
@@ -53,8 +52,7 @@ def main():
     print("✓ Pipeline initialized successfully\n")
     
     # Simulate processing batches
-    batch_size = config. get("batch_size", 100)
-    checkpoint_interval = config.get("checkpoint_interval", 10)
+    batch_size = config.get("batch_size", 100)
     
     for batch_num in range(1, 4):
         print(f"Processing batch {batch_num} ({batch_size} items)...")

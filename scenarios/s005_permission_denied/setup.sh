@@ -11,7 +11,7 @@ docker volume create "$VOLUME_NAME" >/dev/null 2>&1 || true
 # Seed the volume as root (UID 0)
 docker run --rm -v "${VOLUME_NAME}:/data" alpine:3.20 sh -c '
   mkdir -p /data/config /data/checkpoints
-  echo "{\"batch_size\": 100, \"checkpoint_interval\": 10}" > /data/config/settings.json
+  echo "{\"batch_size\": 100}" > /data/config/settings.json
   echo "Volume initialized by setup script (UID 0)"
   ls -la /data/
 '
