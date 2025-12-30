@@ -327,3 +327,109 @@ def container_inspect_probe(container: Container, probe_name: str = "container_i
             "error": str(e),
             "error_type": type(e).__name__,
         }
+
+
+def inspect_container_runtime_uid(
+    container: Container,
+    probe_name: str = "inspect_container_runtime_uid",
+):
+    """Inspect the runtime UID/GID that a container is executing as.
+    
+    Executes the `id` command inside a running container to determine:
+    - Effective UID (user ID)
+    - Effective GID (group ID)
+    - Username
+    - Group memberships
+    
+    Critical for diagnosing permission mismatches where container user
+    (e.g., UID 1000) cannot access volume files owned by different user
+    (e.g., UID 0/root).
+    
+    This probe is complementary to inspect_volume_file_permissions - together
+    they can identify UID/GID conflicts between container runtime and volume ownership.
+    
+    Args:
+        container: Docker container object to inspect
+        probe_name: Identifier for this probe execution
+        
+    Returns:
+        dict: Contains uid, gid, username, groups, and raw_output from `id` command.
+              Returns None values on error (e.g., container not running).
+    """
+    try:
+        # Check if container is running
+        if container.status != "running":
+            return {
+                "container": container.name,
+                "container_status": container.status,
+                "uid": None,
+                "gid": None,
+                "username": None,
+                "groups": None,
+                "raw_output": None,
+                "probe_name": probe_name,
+                "error": f"Container is not running (status: {container.status})",
+                "error_type": "container_not_running",
+            }
+        
+        # Execute `id` command to get user info
+        exec_log = container.exec_run(["id"])
+        if exec_log.exit_code != 0:
+            return {
+                "container": container.name,
+                "uid": None,
+                "gid": None,
+                "username": None,
+                "groups": None,
+                "raw_output": None,
+                "probe_name": probe_name,
+                "error": f"id command failed with exit code {exec_log.exit_code}",
+                "error_type": "command_execution_error",
+            }
+        
+        raw_output = exec_log.output.decode("utf-8", errors="replace").strip()
+        
+        # Parse output: uid=1000(appuser) gid=1000(appuser) groups=1000(appuser)
+        # Extract numeric values for easier comparison
+        uid = None
+        gid = None
+        username = None
+        groups = None
+        
+        try:
+            import re
+            uid_match = re.search(r'uid=(\d+)\(([^)]+)\)', raw_output)
+            gid_match = re.search(r'gid=(\d+)\(([^)]+)\)', raw_output)
+            groups_match = re.search(r'groups=(.+)', raw_output)
+            
+            if uid_match:
+                uid = int(uid_match.group(1))
+                username = uid_match.group(2)
+            if gid_match:
+                gid = int(gid_match.group(1))
+            if groups_match:
+                groups = groups_match.group(1)
+        except Exception:
+            pass  # Parsing failed, return raw output anyway
+        
+        return {
+            "container": container.name,
+            "uid": uid,
+            "gid": gid,
+            "username": username,
+            "groups": groups,
+            "raw_output": raw_output,
+            "probe_name": probe_name,
+        }
+    except Exception as e:
+        return {
+            "container": getattr(container, "name", "unknown"),
+            "uid": None,
+            "gid": None,
+            "username": None,
+            "groups": None,
+            "raw_output": None,
+            "probe_name": probe_name,
+            "error": str(e),
+            "error_type": type(e).__name__,
+        }
