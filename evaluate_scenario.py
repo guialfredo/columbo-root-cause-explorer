@@ -17,6 +17,7 @@ import os
 import dspy
 import time
 import json
+import subprocess
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -183,7 +184,9 @@ def main():
     # Initialize UI if interactive mode
     ui = None
     if args.interactive:
-        ui = ColumboUI(max_steps=manifest.budgets['max_steps'])
+        print("🕵️  Starting interactive UI mode...")
+        print("⚠️  UI will take over the screen. Press Ctrl+C to stop.\n")
+        ui = ColumboUI(max_steps=manifest.budgets['max_steps'], verbose=False)
         ui.start()
     
     try:
@@ -192,6 +195,7 @@ def main():
             max_steps=manifest.budgets['max_steps'],
             workspace_root=str(scenario_ref.scenario_dir),
             ui_callback=ui,
+            verbose=not args.interactive,  # Suppress logs in interactive mode
         )
         
         diagnosis = result["diagnosis"]
@@ -273,6 +277,26 @@ def main():
         try:
             tear_down_scenario(compose_spec)
             print("✓ Scenario torn down")
+            
+            # If cleanup flag was used, also prune unused networks to prevent exhaustion
+            if args.cleanup:
+                print("\n🧹 Pruning unused Docker networks...")
+                try:
+                    result = subprocess.run(
+                        ["docker", "network", "prune", "-f"],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    # Count how many networks were removed
+                    deleted_lines = [l for l in result.stdout.split('\n') if l.strip() and not l.startswith('Deleted')]
+                    if deleted_lines:
+                        print(f"✓ Pruned {len(deleted_lines)} unused network(s)")
+                    else:
+                        print("✓ No unused networks to prune")
+                except Exception as e:
+                    print(f"⚠️  Warning: Failed to prune networks: {e}")
+                    
         except Exception as e:
             print(f"ERROR tearing down scenario: {e}")
     

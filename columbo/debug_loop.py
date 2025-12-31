@@ -27,6 +27,15 @@ import uuid
 from typing import Dict, Any, Optional, List
 
 
+# Module-level verbose flag and print function
+_VERBOSE = True
+
+def vprint(*args, **kwargs):
+    """Verbose print - only prints if verbose mode is enabled."""
+    if _VERBOSE:
+        print(*args, **kwargs)
+
+
 class ContainerCache:
     """Cache for Docker containers to avoid repeated discovery."""
     def __init__(self):
@@ -43,9 +52,9 @@ class ContainerCache:
             self.client = docker.from_env()
             self.containers = self.client.containers.list(all=True)
             self.discovered = True
-            print(f"Discovered {len(self.containers)} Docker containers")
+            vprint(f"Discovered {len(self.containers)} Docker containers")
         except Exception as e:
-            print(f"Error connecting to Docker: {e}")
+            vprint(f"Error connecting to Docker: {e}")
             self.containers = []
             self.client = None
             self.discovered = True
@@ -112,7 +121,7 @@ def resolve_probe_dependencies(
     
     # Check if dependency was already run
     if required_probe not in probe_results_cache:
-        print(f"  → Dependency '{required_probe}' not found, auto-executing...")
+        vprint(f"  → Dependency '{required_probe}' not found, auto-executing...")
         
         # Auto-execute the required probe
         required_func = probe_registry[required_probe]
@@ -126,16 +135,16 @@ def resolve_probe_dependencies(
             result = required_func(probe_name=required_probe)
         
         probe_results_cache[required_probe] = result
-        print(f"  → Auto-executed '{required_probe}'")
+        vprint(f"  → Auto-executed '{required_probe}'")
     else:
-        print(f"  → Using cached result from '{required_probe}'")
+        vprint(f"  → Using cached result from '{required_probe}'")
     
     # Transform the dependency result and merge into args
     cached_result = probe_results_cache[required_probe]
     transformed = dep_config["transform"](cached_result)
     
     file_count = len(transformed.get("found_files", []))
-    print(f"  → Resolved to {file_count} files")
+    vprint(f"  → Resolved to {file_count} files")
     
     # Merge transformed data into args (don't override if explicitly provided)
     for key, value in transformed.items():
@@ -432,7 +441,8 @@ def debug_loop(
     initial_evidence: str, 
     max_steps: int = 10, 
     workspace_root: Optional[str] = None,
-    ui_callback: Optional[Any] = None
+    ui_callback: Optional[Any] = None,
+    verbose: bool = None
 ) -> dict:
     """Main debugging loop with hypothesis generation, probing,
     probe planning, execution, and evidence digestion.
@@ -442,12 +452,22 @@ def debug_loop(
         max_steps: Maximum number of probing steps (default 10)
         workspace_root: Root path of the workspace for file operations
         ui_callback: Optional UI handler for live updates (e.g., ColumboUI instance)
+        verbose: Show verbose print statements (default: False if ui_callback, True otherwise)
         
     Returns:
         dict: Final debugging results including evidence, hypotheses, and probes executed
     """
+    global _VERBOSE
+    
     # Initialize
     container_cache = ContainerCache()
+    
+    # Auto-detect verbose mode based on UI presence
+    if verbose is None:
+        verbose = ui_callback is None
+    
+    # Set module-level verbose flag
+    _VERBOSE = verbose
     
     if workspace_root is None:
         workspace_root = str(Path.cwd())
@@ -466,14 +486,14 @@ def debug_loop(
     evidence_log = []  # Keep detailed log of all findings
     probe_results_cache = {}  # Store structured probe results for inter-probe dependencies
     
-    print(f"Starting debug loop (max {max_steps} steps)...")
-    print(f"Session ID: {session.session_id}")
-    print(f"Workspace: {workspace_root}\n")
+    vprint(f"Starting debug loop (max {max_steps} steps)...")
+    vprint(f"Session ID: {session.session_id}")
+    vprint(f"Workspace: {workspace_root}\n")
     
     for step in range(max_steps):
-        print(f"\n{'='*60}")
-        print(f"Step {step + 1}/{max_steps}")
-        print(f"{'='*60}")
+        vprint(f"\n{'='*60}")
+        vprint(f"Step {step + 1}/{max_steps}")
+        vprint(f"{'='*60}")
         
         # Update UI - new step
         if ui_callback:
@@ -481,7 +501,7 @@ def debug_loop(
         
         try:
             # Generate hypotheses
-            print("\nGenerating hypotheses...")
+            vprint("\nGenerating hypotheses...")
             if ui_callback:
                 ui_callback.update_activity("Generating hypotheses...")
             
@@ -490,8 +510,8 @@ def debug_loop(
             hypotheses = hypotheses_result.hypotheses_output.hypotheses
             key_unknowns = hypotheses_result.hypotheses_output.key_unknowns
             
-            print(f"\nHypotheses:\n{hypotheses}")
-            print(f"\nKey unknowns:\n{key_unknowns}")
+            vprint(f"\nHypotheses:\n{hypotheses}")
+            vprint(f"\nKey unknowns:\n{key_unknowns}")
             
             # Parse and send hypotheses to UI
             if ui_callback:
@@ -521,7 +541,7 @@ def debug_loop(
                 ui_callback.update_hypotheses(hypothesis_list)
             
             # Plan next probe
-            print("\nPlanning next probe...")
+            vprint("\nPlanning next probe...")
             if ui_callback:
                 ui_callback.update_activity("Planning diagnostic probe...")
             
@@ -554,20 +574,20 @@ def debug_loop(
             probe_signature = temp_probe.compute_signature()
             
             if probe_signature in session.get_executed_probe_signatures():
-                print(f"\n⚠ WARNING: This exact probe has already been executed!")
-                print(f"   Probe: {probe_name}")
-                print(f"   Args: {probe_args}")
-                print(f"   Skipping duplicate and moving to next iteration...\n")
+                vprint(f"\n⚠ WARNING: This exact probe has already been executed!")
+                vprint(f"   Probe: {probe_name}")
+                vprint(f"   Args: {probe_args}")
+                vprint(f"   Skipping duplicate and moving to next iteration...\n")
                 # Add a note to evidence that the agent tried to repeat
                 evidence_log.append(f"[Step {step + 1}] Agent attempted to repeat {probe_name} with same args - skipped")
                 continue
             
-            print(f"\nProbe: {probe_name}")
-            print(f"Args: {probe_args}")
-            print(f"Expected signal: {expected_signal}")
+            vprint(f"\nProbe: {probe_name}")
+            vprint(f"Args: {probe_args}")
+            vprint(f"Expected signal: {expected_signal}")
             
             # Execute probe
-            print(f"\nExecuting probe '{probe_name}'...")
+            vprint(f"\nExecuting probe '{probe_name}'...")
             if ui_callback:
                 ui_callback.update_activity(f"Executing: {probe_name}")
             
@@ -613,12 +633,12 @@ def debug_loop(
                 ui_callback.add_probe_execution(step + 1, probe_name, success)
             
             probe_result_str = format_probe_result(raw_probe_result)
-            print(f"\nProbe result:\n{probe_result_str[:500]}...")
+            vprint(f"\nProbe result:\n{probe_result_str[:500]}...")
             if probe_call.duration_seconds:
-                print(f"Execution time: {probe_call.duration_seconds:.2f}s")
+                vprint(f"Execution time: {probe_call.duration_seconds:.2f}s")
             
             # Digest evidence - create a compact summary of this probe's findings
-            print("\nDigesting evidence...")
+            vprint("\nDigesting evidence...")
             if ui_callback:
                 ui_callback.update_activity("Digesting evidence...")
             prior_evidence_text = "\n".join(evidence_log)
@@ -642,7 +662,7 @@ def debug_loop(
             finding_entry = f"[Step {step + 1} - {probe_name}] {new_info}"
             evidence_log.append(finding_entry)
             
-            print(f"\nNew finding:\n{new_info}")
+            vprint(f"\nNew finding:\n{new_info}")
             
             # Update UI with latest finding
             if ui_callback:
@@ -678,7 +698,7 @@ def debug_loop(
             )
             
             # Agent-driven stopping decision
-            print(f"\nEvaluating whether to stop debugging...")
+            vprint(f"\nEvaluating whether to stop debugging...")
             if ui_callback:
                 ui_callback.update_activity("Evaluating confidence...")
             
@@ -696,9 +716,9 @@ def debug_loop(
             session.should_stop = should_stop
             session.stop_reason = stop_decision.reasoning
             
-            print(f"Stop decision: {stop_decision.should_stop}")
-            print(f"Confidence: {stop_decision.confidence}")
-            print(f"Reasoning: {stop_decision.reasoning}")
+            vprint(f"Stop decision: {stop_decision.should_stop}")
+            vprint(f"Confidence: {stop_decision.confidence}")
+            vprint(f"Reasoning: {stop_decision.reasoning}")
             
             # Update UI with stop decision
             if ui_callback:
@@ -716,24 +736,24 @@ def debug_loop(
                     ui_callback.update_activity(f"Continuing investigation...")
             
             if should_stop:
-                print("\n✓ Agent decided to stop debugging!")
+                vprint("\n✓ Agent decided to stop debugging!")
                 break
             
             # Also check if error appears in evidence
             if "error" in raw_probe_result and "Unknown probe" in str(raw_probe_result.get("error", "")):
-                print(f"\n⚠ Probe execution error, but continuing...")
+                vprint(f"\n⚠ Probe execution error, but continuing...")
                 
         except Exception as e:
-            print(f"\n✗ Error in debug loop step {step + 1}: {e}")
+            vprint(f"\n✗ Error in debug loop step {step + 1}: {e}")
             evidence += f"\n\nError in step {step + 1}: {str(e)}"
             # Continue to next iteration
     
-    print(f"\n\n{'='*60}")
-    print("Debug loop completed")
-    print(f"{'='*60}")
+    vprint(f"\n\n{'='*60}")
+    vprint("Debug loop completed")
+    vprint(f"{'='*60}")
     
     # Generate final diagnosis and recommendations
-    print("\n\nGenerating final diagnosis...")
+    vprint("\n\nGenerating final diagnosis...")
     probes_summary = "\n".join([
         f"{i}. {p.probe_name} - {p.probe_args}" 
         for i, p in enumerate(session.probe_history, 1)
@@ -747,15 +767,15 @@ def debug_loop(
     diagnosis = diagnosis_result.diagnosis_result
     
     # Print formatted diagnosis
-    print("\n" + "="*60)
-    print("FINAL DIAGNOSIS")
-    print("="*60)
-    print(f"\nRoot Cause:\n{diagnosis.root_cause}")
-    print(f"\nConfidence: {diagnosis.confidence}")
-    print(f"\nRecommended Fixes:\n{diagnosis.recommended_fixes}")
+    vprint("\n" + "="*60)
+    vprint("FINAL DIAGNOSIS")
+    vprint("="*60)
+    vprint(f"\nRoot Cause:\n{diagnosis.root_cause}")
+    vprint(f"\nConfidence: {diagnosis.confidence}")
+    vprint(f"\nRecommended Fixes:\n{diagnosis.recommended_fixes}")
     if diagnosis.additional_notes:
-        print(f"\nAdditional Notes:\n{diagnosis.additional_notes}")
-    print("\n" + "="*60)
+        vprint(f"\nAdditional Notes:\n{diagnosis.additional_notes}")
+    vprint("\n" + "="*60)
     
     # Mark session as finished
     session.finished_at = datetime.utcnow()
