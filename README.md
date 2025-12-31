@@ -14,7 +14,11 @@ An intelligent root cause exploration engine that helps you investigate failures
 
 ## Overview
 
-Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, it guides a structured investigation by:
+**Origin Story:** Columbo was born from a frustrating debugging session right before the holidays. An environment variable override buried in a YAML config file caused a production-like failure that took way too much time to track down through manual container inspection, log diving, and configuration archaeology. Sound familiar?
+
+That bug became scenario `s001_env_override`, and the motivation to build something better.
+
+Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, trial-and-error, or hoping ChatGPT remembers Docker networking, it guides a structured investigation:
 
 1. **Generating hypotheses** about potential root causes based on available evidence
 2. **Planning and executing diagnostic probes** to gather targeted evidence
@@ -22,7 +26,7 @@ Columbo systematically investigates issues in your local containerized environme
 4. **Deciding when to stop** based on evidence quality and explicit confidence criteria
 5. **Producing comprehensive diagnoses** with root causes and recommended fixes
 
-The agent operates entirely through structured probes—deterministic inspection tools that examine container states, logs, configurations, network connectivity, and more.
+The agent operates entirely through structured probes—deterministic inspection tools that examine container states, logs, configurations, network connectivity, and more. No guessing, no hallucinations, just systematic evidence gathering and reasoning.
 
 ## Design Principles
 
