@@ -7,12 +7,14 @@ from .container_probes import (
     container_mounts_probe,
     containers_ports_probe,
     container_inspect_probe,
+    inspect_container_runtime_uid,
 )
 from .volume_probes import (
     list_volumes_probe,
     volume_metadata_probe,
     volume_data_inspection_probe,
     volume_file_read_probe,
+    inspect_volume_file_permissions,
 )
 from .network_probes import (
     dns_resolution_probe,
@@ -46,6 +48,8 @@ probe_registry = {
     "container_mounts": container_mounts_probe,
     "volume_data_inspection": volume_data_inspection_probe,
     "volume_file_read": volume_file_read_probe,
+    "inspect_volume_file_permissions": inspect_volume_file_permissions,
+    "inspect_container_runtime_uid": inspect_container_runtime_uid,
 }
 
 
@@ -191,6 +195,23 @@ PROBE_SCHEMAS = {
         },
         "required_args": {"volume_name", "file_path"},
         "example": '{"volume_name": "s003_data", "file_path": "/schema_version.txt"}',
+    },
+    "inspect_volume_file_permissions": {
+        "description": "Inspect file ownership (UID/GID) and permissions in a volume. Critical for diagnosing permission mismatches between volume initialization and container runtime user. Uses ls -ln to show numeric UIDs/GIDs. Volume is inspected at its root - use path_in_volume='/' for volume root, or '/subdir' for subdirectories. Requires actual Docker volume name.",
+        "args": {
+            "volume_name": "Name of the volume to inspect (required)",
+            "path_in_volume": "Path within the volume root to inspect. Use '/' for volume root, '/config' for config subdir, etc. (default: /)",
+        },
+        "required_args": {"volume_name"},
+        "example": '{"volume_name": "s005_permission_denied_s005_data", "path_in_volume": "/"}',
+    },
+    "inspect_container_runtime_uid": {
+        "description": "Inspect the UID/GID that a running container is executing as. Critical for diagnosing permission mismatches where container user cannot access volume files owned by different user. Executes 'id' command in container.",
+        "args": {
+            "container": "Name or ID of the running container to inspect (required)",
+        },
+        "required_args": {"container"},
+        "example": '{"container": "s005_worker"}',
     },
 }
 
