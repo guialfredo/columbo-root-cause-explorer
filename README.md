@@ -22,6 +22,8 @@ As a lifelong Columbo fan, I've always admired the detective's smart yet humble 
 
 Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, trial-and-error, or hoping ChatGPT remembers Docker networking, it guides a structured investigation:
 
+Just as Columbo would start every case by carefully observing the crime scene—collecting every clue, no matter how small—Columbo (the tool) begins each investigation with the initial evidence you provide. This initial state frames the entire debugging session, guiding the agent's first hypotheses and lines of questioning.
+
 1. **Generating hypotheses** about potential root causes based on available evidence
 2. **Planning and executing diagnostic probes** to gather targeted evidence
 3. **Digesting findings** and updating its understanding iteratively
