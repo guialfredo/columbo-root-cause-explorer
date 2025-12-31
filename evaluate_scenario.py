@@ -288,8 +288,14 @@ def main():
                         text=True,
                         check=True
                     )
-                    # Count how many networks were removed
-                    deleted_lines = [l for l in result.stdout.split('\n') if l.strip() and not l.startswith('Deleted')]
+                    # Count how many networks were removed (network IDs only, exclude headers/footers)
+                    deleted_lines = [
+                        l
+                        for l in result.stdout.split('\n')
+                        if l.strip()
+                        and not l.startswith("Deleted Networks")
+                        and not l.startswith("Total reclaimed space")
+                    ]
                     if deleted_lines:
                         print(f"✓ Pruned {len(deleted_lines)} unused network(s)")
                     else:

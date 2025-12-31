@@ -7,13 +7,12 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
 from rich.table import Table
 from rich.text import Text
 from rich.console import Console, Group
-from rich.syntax import Syntax
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 from columbo.schemas import DebugSession, ProbeCall, Finding, ConfidenceLevel
-import json
 import sys
 import io
+import re
 
 
 class SuppressOutput:
@@ -127,12 +126,10 @@ class ColumboUI:
                     "low": "blue"
                 }.get(hyp.get("confidence", "").lower(), "white")
                 
-                # Clean up description - remove "H1:", "H2:" prefixes if present
+                # Clean up description - remove "H1:", "H2:", "H10:" etc prefixes if present
                 desc = hyp.get('description', 'Unknown')
                 desc = desc.strip()
-                # Remove leading H1:, H2:, etc if present
-                if desc and len(desc) > 3 and desc[0] == 'H' and desc[2] == ':':
-                    desc = desc[3:].strip()
+                desc = re.sub(r'^H\d+:\s*', '', desc)
                 
                 # Aggressive truncate for compact display - aim for ~65 chars max
                 # First, try to find a natural break point early (dash, comma, em-dash)
