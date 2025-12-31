@@ -647,8 +647,8 @@ def debug_loop(
             # Update UI with latest finding
             if ui_callback:
                 ui_callback.update_finding({
-                    "summary": new_info[:200],
-                    "significance": expected_signal[:100] if expected_signal else "N/A"
+                    "summary": new_info,
+                    "significance": expected_signal if expected_signal else "N/A"
                 })
             
             # Reconstruct full evidence from initial problem + all findings
@@ -703,6 +703,13 @@ def debug_loop(
             # Update UI with stop decision
             if ui_callback:
                 ui_callback.update_confidence(stop_decision.confidence)
+                # Update stop decision display with full information
+                if hasattr(ui_callback, 'update_stop_decision'):
+                    ui_callback.update_stop_decision(
+                        should_stop, 
+                        stop_decision.reasoning,
+                        stop_decision.confidence
+                    )
                 if should_stop:
                     ui_callback.update_activity(f"✓ Stopping: {stop_decision.reasoning[:60]}...")
                 else:
