@@ -102,11 +102,13 @@ echo "OPENAI_API_KEY=your-api-key-here" > .env
 
 ## Usage
 
-### Basic Usage
+### Interactive UI Mode (Recommended)
+
+Watch Columbo investigate in real-time with a live Terminal UI:
 
 ```python
 from columbo.debug_loop import debug_loop
-from columbo.session_utils import save_session_to_file, generate_session_report
+from columbo.ui import ColumboUI
 
 # Define your problem
 initial_evidence = """
@@ -119,11 +121,46 @@ Context:
 - docker-compose.yml exists in the project root
 """
 
+# Create interactive UI
+ui = ColumboUI(max_steps=6)
+ui.start()
+
+try:
+    # Run with live updates
+    result = debug_loop(
+        initial_evidence=initial_evidence,
+        max_steps=6,
+        workspace_root="/path/to/your/project",
+        ui_callback=ui
+    )
+    
+    # Show final diagnosis
+    ui.show_final_diagnosis(result["diagnosis"])
+finally:
+    ui.stop()
+```
+
+The interactive UI shows:
+- 🔍 Current hypothesis being tested
+- ⚙️ Active probe execution with spinner
+- 📊 Latest evidence collected
+- 📝 History of all probes
+- 📈 Progress bar and confidence level
+
+### Programmatic Usage (Silent Mode)
+
+For scripting or automation, run without UI:
+
+```python
+from columbo.debug_loop import debug_loop
+from columbo.session_utils import save_session_to_file, generate_session_report
+
 # Run the debug loop
 result = debug_loop(
     initial_evidence=initial_evidence,
     max_steps=6,
-    workspace_root="/path/to/your/project"
+    workspace_root="/path/to/your/project",
+    ui_callback=None  # No UI
 )
 
 # Access results
@@ -142,6 +179,10 @@ generate_session_report(session_model, output_dir="./debug_sessions")
 ### Running the Example
 
 ```bash
+# Interactive mode
+python -m columbo.main_interactive
+
+# Classic verbose mode
 python -m columbo.main
 ```
 

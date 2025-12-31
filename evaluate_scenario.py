@@ -17,6 +17,7 @@ import os
 import dspy
 import time
 import json
+import subprocess
 
 # Add project root to path
 project_root = Path(__file__).parent
@@ -33,6 +34,7 @@ from columbo.session_utils import (
     save_session_to_file,
     generate_session_report,
 )
+from columbo.ui import ColumboUI
 
 
 def setup_dspy_llm(api_key: str):
@@ -93,6 +95,11 @@ def main():
         type=Path,
         default=Path("evaluation_results"),
         help="Directory to save evaluation results"
+    )
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Enable interactive Rich UI for live investigation updates"
     )
     
     args = parser.parse_args()
@@ -174,15 +181,29 @@ def main():
     
     print(f"\nInitial Evidence:\n{initial_evidence}\n")
     
+    # Initialize UI if interactive mode
+    ui = None
+    if args.interactive:
+        print("🕵️  Starting interactive UI mode...")
+        print("⚠️  UI will take over the screen. Press Ctrl+C to stop.\n")
+        ui = ColumboUI(max_steps=manifest.budgets['max_steps'], verbose=False)
+        ui.start()
+    
     try:
         result = debug_loop(
             initial_evidence=initial_evidence,
             max_steps=manifest.budgets['max_steps'],
             workspace_root=str(scenario_ref.scenario_dir),
+            ui_callback=ui,
+            verbose=not args.interactive,  # Suppress logs in interactive mode
         )
         
         diagnosis = result["diagnosis"]
         session_model = result["session_model"]
+        
+        # Stop UI if interactive
+        if ui:
+            ui.stop()
         
     except Exception as e:
         print(f"ERROR during debugging: {e}")
@@ -256,6 +277,32 @@ def main():
         try:
             tear_down_scenario(compose_spec)
             print("✓ Scenario torn down")
+            
+            # If cleanup flag was used, also prune unused networks to prevent exhaustion
+            if args.cleanup:
+                print("\n🧹 Pruning unused Docker networks...")
+                try:
+                    result = subprocess.run(
+                        ["docker", "network", "prune", "-f"],
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    # Count how many networks were removed (network IDs only, exclude headers/footers)
+                    deleted_lines = [
+                        l
+                        for l in result.stdout.split('\n')
+                        if l.strip()
+                        and not l.startswith("Deleted Networks")
+                        and not l.startswith("Total reclaimed space")
+                    ]
+                    if deleted_lines:
+                        print(f"✓ Pruned {len(deleted_lines)} unused network(s)")
+                    else:
+                        print("✓ No unused networks to prune")
+                except Exception as e:
+                    print(f"⚠️  Warning: Failed to prune networks: {e}")
+                    
         except Exception as e:
             print(f"ERROR tearing down scenario: {e}")
     
