@@ -546,10 +546,19 @@ def debug_loop(
                         reason = ""
                         
                         for part in parts[1:]:
-                            if 'confidence:' in part.lower():
-                                conf = part.split(':')[1].strip()
-                            elif 'why:' in part.lower():
-                                reason = part.split(':')[1].strip()
+                            part_lower = part.lower()
+                            if 'confidence:' in part_lower:
+                                if ':' in part:
+                                    _, value = part.split(':', 1)
+                                    value = value.strip()
+                                    if value:
+                                        conf = value
+                            elif 'why:' in part_lower:
+                                if ':' in part:
+                                    _, value = part.split(':', 1)
+                                    value = value.strip()
+                                    if value:
+                                        reason = value
                         
                         hypothesis_list.append({
                             "description": desc,

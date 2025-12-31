@@ -147,19 +147,6 @@ The interactive UI shows:
 - 📝 History of all probes
 - 📈 Progress bar and confidence level
 
-### Quick Start Demo
-
-```bash
-# Full interactive UI
-python demo_ui.py full
-
-# Simple progress bar only
-python demo_ui.py simple
-
-# Verbose logs (no UI)
-python demo_ui.py silent
-```
-
 ### Programmatic Usage (Silent Mode)
 
 For scripting or automation, run without UI:
