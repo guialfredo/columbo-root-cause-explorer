@@ -285,7 +285,7 @@ After investigation, Columbo generates comprehensive reports with the diagnosis 
 
 ### Generated Markdown Report
 
-```markdown
+````markdown
 # Debug Session Report: abc123ef
 
 **Session Started:** 2025-12-31 10:15:30 UTC
@@ -328,7 +328,7 @@ The frontend container is configured with BACKEND_HOST=localhost:8080,
 causing it to attempt connections to its own container rather than the 
 backend service. The hostname should reference the service name from 
 docker-compose for proper container-to-container communication.
-```
+````
 
 ### Generated Artifacts
 
