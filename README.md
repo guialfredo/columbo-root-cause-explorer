@@ -18,6 +18,8 @@ An intelligent root cause exploration engine that helps you investigate failures
 
 That bug became scenario `s001_env_override`, and the motivation to build something better.
 
+As a lifelong Columbo fan, I've always admired the detective's smart yet humble investigating style: asking simple questions, following evidence methodically, and never making assumptions. "Just one more thing..." wasn't about showing off, it was about systematic, patient investigation until the truth emerged. That's exactly how debugging should work.
+
 Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, trial-and-error, or hoping ChatGPT remembers Docker networking, it guides a structured investigation:
 
 1. **Generating hypotheses** about potential root causes based on available evidence
