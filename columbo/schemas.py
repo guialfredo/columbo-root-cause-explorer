@@ -105,7 +105,15 @@ class ProbePlan(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     probe_name: str = Field(..., description="Name of the probe to run (must be in tools_spec).")
-    probe_args: str = Field(..., description="JSON dict of arguments for that probe. Use only keys allowed by tools_spec.")
+    probe_args: str = Field(
+        ..., 
+        description=(
+            "JSON dict of arguments for that probe. Use only keys allowed by tools_spec. "
+            "CRITICAL: Use ACTUAL concrete values from evidence"
+            "NEVER use placeholders like '<container_name>' or '<path>'. "
+            "If a value is not in evidence, use a different probe to discover it first."
+        )
+    )
     expected_signal: str = Field(..., description="What would confirm/refute the top hypothesis.")
     stop_if: str = Field(..., description="Condition to stop probing and move to final diagnosis.")
 
