@@ -27,6 +27,7 @@ class ColumboUI:
         self.probe_history: List[Dict[str, Any]] = []
         self.confidence = "unknown"
         self.current_probe_plan = None  # Store current probe plan details
+        self.stop_decision = None  # Store stop decision info
         
         # Progress tracking
         self.progress = Progress(
@@ -49,7 +50,7 @@ class ColumboUI:
             Layout(name="right", ratio=1),
         )
         self.layout["left"].split_column(
-            Layout(name="investigation", ratio=1),
+            Layout(name="investigation", ratio=2),
             Layout(name="evidence", ratio=1),
         )
         
@@ -94,13 +95,16 @@ class ColumboUI:
             inv_content.append(f"[bold magenta]📋 Next Probe:[/bold magenta]")
             inv_content.append(f"  [cyan]{self.current_probe_plan['name']}[/cyan]")
             args_str = str(self.current_probe_plan.get('args', ''))
-            if len(args_str) > 60:
-                args_str = args_str[:57] + "..."
+            # Allow more space for args display with larger panel
+            if len(args_str) > 120:
+                args_str = args_str[:117] + "..."
             inv_content.append(f"  [dim]Args: {args_str}[/dim]")
             if self.current_probe_plan.get('expected'):
                 exp = self.current_probe_plan['expected']
-                if len(exp) > 60:
-                    exp = exp[:57] + "..."
+                # Allow full display of expected signal since panel has more space
+                # Only truncate extremely long expectations
+                if len(exp) > 200:
+                    exp = exp[:197] + "..."
                 inv_content.append(f"  [dim]Expecting: {exp}[/dim]")
         
         if self.hypotheses:
@@ -121,9 +125,9 @@ class ColumboUI:
                 if desc and len(desc) > 3 and desc[0] == 'H' and desc[2] == ':':
                     desc = desc[3:].strip()
                 
-                # Truncate to 70 chars for cleaner display
-                if len(desc) > 70:
-                    desc = desc[:67] + "..."
+                # Only truncate very long hypotheses to keep display manageable
+                if len(desc) > 150:
+                    desc = desc[:147] + "..."
                 
                 conf_badge = {
                     "high": "🔴",
@@ -137,6 +141,16 @@ class ColumboUI:
             if len(self.hypotheses) > 5:
                 inv_content.append(f"  [dim]...and {len(self.hypotheses) - 5} more[/dim]")
         
+        # Show stop decision if available
+        if self.stop_decision:
+            inv_content.append("")
+            if self.stop_decision["should_stop"]:
+                inv_content.append(f"[bold red]🛑 Stop Decision: YES[/bold red]")
+                inv_content.append(f"  [yellow]Reasoning:[/yellow] {self.stop_decision['reasoning']}")
+            else:
+                inv_content.append(f"[bold green]▶ Continue Investigation[/bold green]")
+                inv_content.append(f"  [dim]{self.stop_decision['reasoning']}[/dim]")
+        
         self.layout["investigation"].update(
             Panel(
                 "\n".join(inv_content),
@@ -147,15 +161,17 @@ class ColumboUI:
         
         # Evidence panel
         if self.latest_finding:
-            evidence_text = []
-            evidence_text.append(f"[bold green]Latest Finding:[/bold green]")
-            evidence_text.append(f"  {self.latest_finding['summary']}")
-            evidence_text.append("")
-            evidence_text.append(f"[dim]Significance:[/dim] {self.latest_finding.get('significance', 'N/A')}")
+            evidence_parts = []
+            evidence_parts.append(Text("Latest Finding:", style="bold green"))
+            evidence_parts.append(Text(""))
+            
+            # Create properly wrapped text for the finding
+            summary_text = Text(self.latest_finding['summary'])
+            evidence_parts.append(summary_text)
             
             self.layout["evidence"].update(
                 Panel(
-                    "\n".join(evidence_text),
+                    Group(*evidence_parts),
                     title="📊 Evidence Collected",
                     border_style="green"
                 )
@@ -250,6 +266,16 @@ class ColumboUI:
     def update_confidence(self, confidence: str):
         """Update confidence level."""
         self.confidence = confidence
+        if self.live:
+            self.live.update(self.render())
+    
+    def update_stop_decision(self, should_stop: bool, reasoning: str, confidence: str):
+        """Update stop decision information."""
+        self.stop_decision = {
+            "should_stop": should_stop,
+            "reasoning": reasoning,
+            "confidence": confidence
+        }
         if self.live:
             self.live.update(self.render())
     
