@@ -58,6 +58,7 @@ htmlcov/
 # Debug sessions
 debug_sessions/
 evaluation_results/
+columbo_sessions/
 
 # Poetry
 poetry.lock
