@@ -6,52 +6,59 @@ Columbo must balance two competing objectives:
 - **Efficiency**: Solve problems in as few steps as possible
 - **Groundedness**: Gather sufficient evidence before concluding, ensuring trustworthy diagnoses
 
-## Evaluation Metrics
+## Current Metrics (Implemented)
 
 All scenarios include labeled ground truth data in `manifest.json` for scoring.
 
-### 1. Task Completion
-- **Method**: LLM-as-judge grading
-- **Question**: Did Columbo correctly identify and explain the root cause?
-- **Output**: Score (e.g., 0-10 or pass/fail)
-
-### 2. Stopping Criterion Quality
-- **Method**: LLM-as-judge grading
-- **Question**: Was the decision to stop debugging justified by the evidence gathered?
-- **Purpose**: Measures groundedness - did it conclude prematurely or gather sufficient proof?
-- **Output**: Score (e.g., 0-10)
-
-### 3. Tool Recall
-- **Method**: Automated comparison against manifest.json
+### 1. Probe Recall
+- **Method**: Automated comparison against `manifest.json`
 - **Question**: Did Columbo call all mandatory probes defined in the scenario?
-- **Output**: Recall percentage (mandatory tools called / total mandatory tools)
+- **Output**: Recall percentage (mandatory probes called / total mandatory probes)
+- **Implementation**: `calculate_probe_recall()` in `evaluation/metrics.py`
 
-### 4. Step Efficiency
-- **Method**: Simple count comparison
+### 2. Step Efficiency
+- **Method**: Automated count comparison
 - **Metrics**:
   - Total steps taken
-  - Comparison to optimal path (defined in manifest.json)
-  - Ratio: actual steps / optimal steps
+  - Optimal steps (defined in manifest.json)
+  - Efficiency score: min(1.0, optimal_steps / steps_used)
+  - Efficiency ratio: optimal_steps / steps_used (uncapped)
+- **Implementation**: `calculate_step_efficiency()` in `evaluation/metrics.py`
 
-### 5. Problem Category Identification
-- **Method**: Binary match against manifest.json
-- **Question**: Did Columbo correctly classify the problem category?
-- **Output**: Binary (correct/incorrect)
+### 3. Groundedness
+- **Method**: LLM-as-judge grading
+- **Question**: Is the diagnosis well-supported by the evidence gathered? Did the agent jump to conclusions?
+- **Purpose**: Measures whether claims are backed by concrete evidence from probes
+- **Output**: Score (0-10) with justification
+- **Implementation**: `calculate_groundedness()` using DSPy ChainOfThought in `evaluation/metrics.py`
+
+### 4. Category Match (Placeholder)
+- **Method**: Automated binary check against `manifest.json`
+- **Question**: Did Columbo correctly identify the problem category?
+- **Status**: **Not functional yet** - requires agent to track and output problem categories
+- **Taxonomy**: Defined in `evaluation/categories_taxonomy.json`
+- **Categories**: configuration, build-configuration, volumes, networking, permission, resource, dependency
+- **Implementation**: `calculate_category_match()` - currently returns False until agent enhancement
+- **Next Steps**: 
+  1. Provide taxonomy to agent during investigation
+  2. Add category field to DiagnosisResult schema
+  3. Teach agent to classify problems
 
 ## Future Enhancements
 
 Potential additions for later iterations:
-- **Early detection**: How many steps before identifying the correct category?
-- **Tool precision**: Percentage of probes that were relevant vs unnecessary
-- **Evidence quality**: Richness of gathered evidence per step
-- **Reasoning coherence**: Quality of hypothesis evolution
+- **Task Completion**: LLM judge comparing final diagnosis against expected root cause ID
+- **Early Detection**: How many steps before identifying the correct category?
+- **Tool Precision**: Percentage of probes that were relevant vs unnecessary
+- **Evidence Quality**: Richness of gathered evidence per step
+- **Reasoning Coherence**: Quality of hypothesis evolution over time
 
 ## Summary Table
 
-| Metric | Type | Data Source | Complexity |
-|--------|------|-------------|------------|
-| Task Completion | LLM Judge | Debug report | Medium |
-| Stopping Quality | LLM Judge | Session + evidence | Medium |
-| Tool Recall | Automated | manifest.json | Low |
-| Step Efficiency | Automated | Session log | Low |
-| Category Match | Automated | manifest.json | Low |
+| Metric | Type | Status | Data Source | Complexity |
+|--------|------|--------|-------------|------------|
+| Probe Recall | Automated | ✅ Implemented | manifest.json | Low |
+| Step Efficiency | Automated | ✅ Implemented | Session log | Low |
+| Groundedness | LLM Judge | ✅ Implemented | Diagnosis + Evidence | Medium |
+| Category Match | Automated | ⚠️ Placeholder | manifest.json + taxonomy | Low |
+| Task Completion | LLM Judge | ❌ Future | Diagnosis + Expected RC | Medium |
