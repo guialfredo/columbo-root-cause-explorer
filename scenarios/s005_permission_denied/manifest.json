@@ -5,6 +5,11 @@
   "category": "permission",
   "grading": {
     "expected_root_cause_id": "PERMISSION_DENIED_UID_GID_CONFLICT",
+    "mandatory_probes": [
+      "container_logs",
+      "inspect_container_runtime_uid",
+      "inspect_volume_file_permissions"
+    ],
     "proof_requirements": [
       "identified_permission_denied_error",
       "checked_container_logs", 
@@ -14,7 +19,7 @@
     ]
   },
   "budgets": {
-    "max_steps": 10,
+    "max_steps": 1,
     "optimal_steps": 8
   },
   "initial_evidence": "When trying docker compose up, Container starts successfully, Logs show: \"Data pipeline initialized ✓\" Then:  \"ERROR: Failed to save checkpoint: Permission denied\" Container keeps restarting"

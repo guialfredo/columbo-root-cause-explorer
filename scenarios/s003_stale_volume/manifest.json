@@ -5,6 +5,11 @@
   "category": "volumes",
   "grading": {
     "expected_root_cause_id": "STALE_VOLUME_CAUSING_ISSUE",
+    "mandatory_probes": [
+      "list_volumes",
+      "container_mounts",
+      "volume_data_inspection"
+    ],
     "proof_requirements": []
   },
   "budgets": {
