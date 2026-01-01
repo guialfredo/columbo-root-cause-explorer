@@ -102,9 +102,44 @@ echo "OPENAI_API_KEY=your-api-key-here" > .env
 
 ## Usage
 
-### Interactive UI Mode (Recommended)
+### Command-Line Interface (Recommended)
 
-Watch Columbo investigate in real-time with a live Terminal UI:
+The easiest way to use Columbo is via the CLI:
+
+```bash
+# Simple usage - describe the problem inline
+columbo debug "My app container fails to connect to postgres"
+
+# Load problem description from a file
+columbo debug --from-file problem.txt
+
+# Use interactive UI mode for live updates
+columbo debug --interactive "Service keeps crashing on startup"
+
+# Specify workspace and custom settings
+columbo debug "Port conflict error" \
+  --workspace /path/to/your/project \
+  --max-steps 10 \
+  --model openai/gpt-5-mini
+
+# Save results to a specific directory
+columbo debug "Network timeout" --output-dir ./debug_results
+```
+
+After installation with `poetry install`, the `columbo` command becomes available in your environment.
+
+**CLI Options:**
+- `--from-file PATH`: Read initial evidence from a text file
+- `--workspace PATH`: Path to your project root (default: current directory)
+- `--max-steps N`: Maximum debugging steps (default: 8)
+- `--interactive`: Enable Rich terminal UI with live updates
+- `--model MODEL`: LLM model to use (default: openai/gpt-5-mini)
+- `--output-dir PATH`: Where to save session results (default: ./columbo_sessions)
+- `--no-save`: Don't save session results to disk
+
+### Interactive UI Mode (Programmatic)
+
+For Python scripts, watch Columbo investigate in real-time with a live Terminal UI:
 
 ```python
 from columbo.debug_loop import debug_loop
@@ -176,17 +211,22 @@ save_session_to_file(session_model, directory="./debug_sessions")
 generate_session_report(session_model, output_dir="./debug_sessions")
 ```
 
-### Running the Example
+### Running Examples
+
+The project includes example entry points:
 
 ```bash
-# Interactive mode
+# Interactive UI mode with example problem
 python -m columbo.main_interactive
 
-# Classic verbose mode
+# Classic verbose mode with example problem
 python -m columbo.main
+
+# Evaluate on a test scenario (for development/testing)
+python evaluate_scenario.py s001_env_override --interactive
 ```
 
-This will run the example debugging session and save:
+The main examples will run against the bundled scenario and save:
 - `debug_session_<id>.json`: Full session data with all probes and findings
 - `report_<id>.md`: Human-readable markdown report
 
@@ -217,7 +257,7 @@ This enables:
 
 ### LLM Configuration
 
-By default, the agent uses `gpt-4o-mini` via DSPy. To use a different model:
+By default, the agent uses `gpt-5-mini` via DSPy. To use a different model:
 
 ```python
 import dspy
