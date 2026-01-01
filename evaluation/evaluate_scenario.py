@@ -19,6 +19,13 @@ import time
 import json
 import subprocess
 
+# Try to import mlflow for experiment tracking (optional)
+try:
+    import mlflow
+    MLFLOW_AVAILABLE = True
+except ImportError:
+    MLFLOW_AVAILABLE = False
+
 # Add project root to path
 project_root = Path(__file__).parent.parent  # Go up from evaluation/ to project root
 sys.path.insert(0, str(project_root))
@@ -82,6 +89,11 @@ def main():
         action="store_true",
         help="Enable interactive Rich UI for live investigation updates"
     )
+    parser.add_argument(
+        "--track",
+        action="store_true",
+        help="Enable MLflow experiment tracking (requires: poetry install --with evaluation)"
+    )
     
     args = parser.parse_args()
     
@@ -98,6 +110,16 @@ def main():
         return 1
     
     setup_dspy_llm(api_key=openai_api_key)
+    
+    # Initialize MLflow tracking if requested and available
+    mlflow_enabled = False
+    if args.track:
+        if MLFLOW_AVAILABLE:
+            mlflow.set_experiment("columbo-evaluation")
+            mlflow_enabled = True
+            print("✓ MLflow tracking enabled")
+        else:
+            print("⚠️  MLflow not available - install with: poetry install --with evaluation")
     
     # Load scenario
     scenarios_root = project_root / "scenarios"
@@ -280,6 +302,41 @@ def main():
     }
     eval_file.write_text(json.dumps(eval_data, indent=2, default=str))
     print(f"💾 Evaluation saved to: {eval_file}")
+    
+    # Log to MLflow if tracking enabled
+    if mlflow_enabled:
+        print(f"\n{'=' * 70}")
+        print("LOGGING TO MLFLOW")
+        print("=" * 70)
+        
+        with mlflow.start_run(run_name=f"{args.scenario_id}_{session_model.session_id}"):
+            # Log parameters
+            mlflow.log_param("scenario_id", manifest.scenario_id)
+            mlflow.log_param("scenario_title", manifest.title)
+            mlflow.log_param("category", manifest.category)
+            mlflow.log_param("difficulty", manifest.difficulty)
+            mlflow.log_param("max_steps", manifest.budgets['max_steps'])
+            mlflow.log_param("optimal_steps", manifest.budgets['optimal_steps'])
+            mlflow.log_param("llm_model", "gpt-5-mini")  # Could make this configurable
+            
+            # Log metrics
+            mlflow.log_metric("probe_recall", probe_recall.recall)
+            mlflow.log_metric("step_efficiency_score", step_efficiency['efficiency_score'])
+            mlflow.log_metric("step_efficiency_ratio", step_efficiency['efficiency_ratio'])
+            mlflow.log_metric("steps_used", step_efficiency['steps_used'])
+            mlflow.log_metric("groundedness_score", groundedness.score)
+            
+            # Log artifacts
+            mlflow.log_artifact(session_file)
+            mlflow.log_artifact(str(report_file))
+            mlflow.log_artifact(str(eval_file))
+            
+            # Set tags for easy filtering
+            mlflow.set_tag("category", manifest.category)
+            mlflow.set_tag("difficulty", manifest.difficulty)
+            mlflow.set_tag("expected_root_cause", manifest.grading['expected_root_cause_id'])
+            
+        print("✓ Logged to MLflow")
     
     # Tear down scenario
     if compose_spec and not args.no_teardown:
