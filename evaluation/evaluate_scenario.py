@@ -20,7 +20,7 @@ import json
 import subprocess
 
 # Add project root to path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent  # Go up from evaluation/ to project root
 sys.path.insert(0, str(project_root))
 
 from scenarios.common.runner import (
@@ -35,36 +35,17 @@ from columbo.session_utils import (
     generate_session_report,
 )
 from columbo.ui import ColumboUI
+from evaluation.metrics import (
+    calculate_probe_recall,
+    calculate_step_efficiency,
+    calculate_groundedness,
+)
 
 
 def setup_dspy_llm(api_key: str):
     """Configure DSPy with your LLM of choice."""
     lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=False)
     dspy.configure(lm=lm)
-
-
-def evaluate_diagnosis(
-    diagnosis: dict,
-    optimal_steps: int,
-    session_model,
-) -> dict:
-    """Evaluate the debugging session performance.
-    
-    Returns:
-        dict with evaluation metrics
-    """
-    steps_used = session_model.current_step
-    
-    # Simple efficiency score: optimal steps / actual steps
-    # Capped at 1.0 for overperformance
-    efficiency_score = min(1.0, optimal_steps / steps_used) if steps_used > 0 else 0
-    
-    return {
-        "steps_used": steps_used,
-        "optimal_steps": optimal_steps,
-        "efficiency_score": efficiency_score,
-        "confidence": diagnosis["confidence"],
-    }
 
 
 def main():
@@ -217,15 +198,46 @@ def main():
     print("EVALUATION RESULTS")
     print("=" * 70)
     
-    evaluation = evaluate_diagnosis(
-        diagnosis=diagnosis,
+    # Calculate step efficiency
+    step_efficiency = calculate_step_efficiency(
         optimal_steps=manifest.budgets['optimal_steps'],
-        session_model=session_model,
+        steps_used=session_model.current_step,
     )
     
-    print(f"\n📊 Efficiency Score: {evaluation['efficiency_score']:.2%}")
-    print(f"   Steps Used: {evaluation['steps_used']} (optimal: {evaluation['optimal_steps']})")
-    print(f"   Confidence: {evaluation['confidence']}")
+    # Calculate probe recall
+    mandatory_probes = manifest.grading.get('mandatory_probes', [])
+    probes_executed = [p.model_dump() for p in session_model.probe_history]
+    probe_recall = calculate_probe_recall(
+        mandatory_probes=mandatory_probes,
+        probes_executed=probes_executed,
+    )
+    
+    # Display metrics
+    print(f"\n📊 Step Efficiency: {step_efficiency['efficiency_score']:.2%}")
+    print(f"   Steps Used: {step_efficiency['steps_used']} (optimal: {step_efficiency['optimal_steps']})")
+    
+    print(f"\n🔍 {probe_recall}")
+    if probe_recall.mandatory_probes_missed:
+        print(f"   Missed probes: {', '.join(probe_recall.mandatory_probes_missed)}")
+    
+    # Calculate groundedness (LLM-as-judge)
+    print("\n⚖️  Evaluating groundedness...")
+    groundedness = calculate_groundedness(
+        diagnosis=diagnosis,
+        evidence_digest=session_model.evidence_digest,
+        probes_executed=probes_executed,
+    )
+    
+    print(f"\n⚖️  {groundedness}")
+    print(f"   {groundedness.justification}")
+    
+    # Combine metrics for saving
+    evaluation = {
+        "step_efficiency": step_efficiency,
+        "probe_recall": probe_recall.model_dump(),
+        "groundedness": groundedness.model_dump(),
+        "diagnosis_confidence": diagnosis["confidence"],
+    }
     
     print(f"\n{'=' * 70}")
     print("DIAGNOSIS")
@@ -263,6 +275,7 @@ def main():
         "evaluation": evaluation,
         "diagnosis": diagnosis,
         "expected_root_cause_id": manifest.grading['expected_root_cause_id'],
+        "mandatory_probes": mandatory_probes,
         "timestamp": session_model.started_at.isoformat(),
     }
     eval_file.write_text(json.dumps(eval_data, indent=2, default=str))
@@ -311,9 +324,9 @@ def main():
     print("EVALUATION COMPLETE")
     print("=" * 70)
     
-    if evaluation['efficiency_score'] >= 0.8:
+    if step_efficiency['efficiency_score'] >= 0.8:
         print("\n✅ EXCELLENT: Debugging completed efficiently!")
-    elif evaluation['efficiency_score'] >= 0.5:
+    elif step_efficiency['efficiency_score'] >= 0.5:
         print("\n⚠️  ACCEPTABLE: Debugging completed but used more steps than optimal")
     else:
         print("\n❌ NEEDS IMPROVEMENT: Debugging took significantly more steps than expected")

@@ -5,6 +5,10 @@
   "category": "networking",
   "grading": {
     "expected_root_cause_id": "PORT_CONFLICT",
+    "mandatory_probes": [
+      "containers_ports",
+      "containers_state"
+    ],
     "proof_requirements": [
       "identified_blocker_container",
       "port_conflict_confirmed"
