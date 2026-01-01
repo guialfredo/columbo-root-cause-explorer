@@ -38,6 +38,7 @@ from columbo.ui import ColumboUI
 from columbo.evaluation_metrics import (
     calculate_probe_recall,
     calculate_step_efficiency,
+    calculate_groundedness,
 )
 
 
@@ -219,10 +220,22 @@ def main():
     if probe_recall.mandatory_probes_missed:
         print(f"   Missed probes: {', '.join(probe_recall.mandatory_probes_missed)}")
     
+    # Calculate groundedness (LLM-as-judge)
+    print("\n⚖️  Evaluating groundedness...")
+    groundedness = calculate_groundedness(
+        diagnosis=diagnosis,
+        evidence_digest=session_model.evidence_digest,
+        probes_executed=probes_executed,
+    )
+    
+    print(f"\n⚖️  {groundedness}")
+    print(f"   {groundedness.justification}")
+    
     # Combine metrics for saving
     evaluation = {
         "step_efficiency": step_efficiency,
         "probe_recall": probe_recall.model_dump(),
+        "groundedness": groundedness.model_dump(),
         "diagnosis_confidence": diagnosis["confidence"],
     }
     
