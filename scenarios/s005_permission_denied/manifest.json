@@ -19,7 +19,7 @@
     ]
   },
   "budgets": {
-    "max_steps": 1,
+    "max_steps": 10,
     "optimal_steps": 8
   },
   "initial_evidence": "When trying docker compose up, Container starts successfully, Logs show: \"Data pipeline initialized ✓\" Then:  \"ERROR: Failed to save checkpoint: Permission denied\" Container keeps restarting"
