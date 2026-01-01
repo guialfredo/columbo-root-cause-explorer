@@ -19,5 +19,11 @@ docker = "^7.1.0"
 dspy = "*"
 rich = "^13.7.0"
 
+[tool.poetry.group.evaluation]
+optional = true
+
+[tool.poetry.group.evaluation.dependencies]
+mlflow = "^3.0.0"
+
 [tool.poetry.scripts]
 columbo = "columbo.cli:main"

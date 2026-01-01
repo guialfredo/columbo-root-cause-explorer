@@ -60,6 +60,10 @@ debug_sessions/
 evaluation_results/
 columbo_sessions/
 
+# MLflow tracking
+mlruns/
+mlartifacts/
+
 # Poetry
 poetry.lock
 

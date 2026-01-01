@@ -22,6 +22,11 @@ from columbo.schemas import (
     ConfidenceLevel,
     Severity,
 )
+from columbo.tracing import (
+    trace_session,
+    trace_reasoning_step,
+    trace_probe_execution,
+)
 from pathlib import Path
 import uuid
 from typing import Dict, Any, Optional, List
@@ -509,6 +514,30 @@ def debug_loop(
     context.vprint(f"Session ID: {session.session_id}")
     context.vprint(f"Workspace: {workspace_root}\n")
     
+    # Start MLflow tracing for the entire session
+    with trace_session(session.session_id, initial_evidence, max_steps):
+        return _debug_loop_impl(context, session, evidence, ui_callback)
+
+
+def _debug_loop_impl(
+    context: DebugContext,
+    session: DebugSession,
+    evidence: str,
+    ui_callback: Optional[Any]
+) -> dict:
+    """Implementation of the debug loop (wrapped by trace_session).
+    
+    Args:
+        context: Debug context with verbose mode and caches
+        session: Debug session object
+        evidence: Current evidence string
+        ui_callback: Optional UI handler
+        
+    Returns:
+        dict: Final debugging results
+    """
+    max_steps = session.max_steps
+    
     for step in range(max_steps):
         context.vprint(f"\n{'='*60}")
         context.vprint(f"Step {step + 1}/{max_steps}")
@@ -528,6 +557,17 @@ def debug_loop(
             hypotheses_result = hypothesis_gen(evidence_input=evidence_input)
             hypotheses = hypotheses_result.hypotheses_output.hypotheses
             key_unknowns = hypotheses_result.hypotheses_output.key_unknowns
+            
+            # Trace hypothesis generation
+            trace_reasoning_step(
+                step_type="hypothesis_generation",
+                step_num=step + 1,
+                inputs={"evidence": evidence[:500]},
+                outputs={
+                    "hypotheses": hypotheses[:500],
+                    "key_unknowns": key_unknowns[:300]
+                }
+            )
             
             context.vprint(f"\nHypotheses:\n{hypotheses}")
             context.vprint(f"\nKey unknowns:\n{key_unknowns}")
@@ -585,6 +625,22 @@ def debug_loop(
             probe_args = probe_plan_result.probe_plan.probe_args
             expected_signal = probe_plan_result.probe_plan.expected_signal
             stop_condition = probe_plan_result.probe_plan.stop_if
+            
+            # Trace probe planning
+            trace_reasoning_step(
+                step_type="probe_planning",
+                step_num=step + 1,
+                inputs={
+                    "hypotheses": hypotheses[:300],
+                    "evidence": evidence[:300]
+                },
+                outputs={
+                    "probe_name": probe_name,
+                    "probe_args": probe_args[:200],
+                    "expected_signal": expected_signal[:200]
+                },
+                metadata={"stop_condition": stop_condition[:100]}
+            )
             
             # Update UI with probe selection
             if ui_callback:
@@ -656,6 +712,14 @@ def debug_loop(
             session.probe_history.append(probe_call)
             session.current_step = step + 1
             
+            # Trace probe execution
+            trace_probe_execution(
+                probe_name=probe_name,
+                probe_args=probe_call.probe_args,
+                result=normalized_result,
+                error=probe_call.error
+            )
+            
             # Update UI with probe execution
             if ui_callback:
                 success = probe_call.error is None
@@ -677,6 +741,17 @@ def debug_loop(
             )
             evidence_digest_result = evidence_digest(digest_input=digest_input)
             new_finding = evidence_digest_result.digest_output.updated_evidence_digest
+            
+            # Trace evidence digestion
+            trace_reasoning_step(
+                step_type="evidence_digestion",
+                step_num=step + 1,
+                inputs={
+                    "raw_probe_result": probe_result_str[:500],
+                    "prior_evidence": prior_evidence_text[:300]
+                },
+                outputs={"new_finding": new_finding[:500]}
+            )
             
             # Extract just the NEW information (not the full cumulative digest)
             # by looking at what was added beyond the prior evidence
@@ -742,6 +817,23 @@ def debug_loop(
             stop_decision = stop_result.stop_decision
             should_stop = stop_decision.should_stop == "yes"
             
+            # Trace stop decision
+            trace_reasoning_step(
+                step_type="stop_decision",
+                step_num=step + 1,
+                inputs={
+                    "evidence": evidence[:500],
+                    "hypotheses": hypotheses[:300],
+                    "steps_used": steps_used,
+                    "steps_remaining": steps_remaining
+                },
+                outputs={
+                    "should_stop": stop_decision.should_stop,
+                    "confidence": stop_decision.confidence,
+                    "reasoning": stop_decision.reasoning
+                }
+            )
+            
             session.should_stop = should_stop
             session.stop_reason = stop_decision.reasoning
             
@@ -794,6 +886,22 @@ def debug_loop(
         probes_summary=probes_summary
     )
     diagnosis = diagnosis_result.diagnosis_result
+    
+    # Trace final diagnosis
+    trace_reasoning_step(
+        step_type="final_diagnosis",
+        step_num=None,  # Final step, not part of loop
+        inputs={
+            "initial_problem": initial_evidence[:300],
+            "evidence": evidence[:500],
+            "probes_summary": probes_summary[:300]
+        },
+        outputs={
+            "root_cause": diagnosis.root_cause,
+            "confidence": diagnosis.confidence,
+            "recommended_fixes": diagnosis.recommended_fixes[:300]
+        }
+    )
     
     # Print formatted diagnosis
     context.vprint("\n" + "="*60)
