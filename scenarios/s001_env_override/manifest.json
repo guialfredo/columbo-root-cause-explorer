@@ -5,6 +5,11 @@
   "category": "configuration",
   "grading": {
     "expected_root_cause_id": "ENV_OVERRIDE_RUNTIME_CONFIG",
+    "mandatory_probes": [
+      "docker_compose_parsing",
+      "generic_config_parsing",
+      "container_inspect"
+    ],
     "proof_requirements": [
       { "type": "file_value", "path": "config/environment.yml", "contains": "localhost" },
       { "type": "runtime_connection", "service": "rag_agent", "host": "localhost", "port": 6333 }
