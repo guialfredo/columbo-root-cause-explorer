@@ -682,7 +682,7 @@ def _debug_loop_impl(
                 probe_args_str=probe_args,
                 container_cache=context.container_cache,
                 probe_results_cache=context.probe_results_cache,
-                workspace_root=workspace_root,
+                workspace_root=context.workspace_root,
                 context=context
             )
             
@@ -790,7 +790,7 @@ def _debug_loop_impl(
             steps_remaining = max_steps - steps_used
             
             evidence = (
-                f"{initial_evidence}\n\n"
+                f"{session.initial_problem}\n\n"
                 f"--- Debug Session Info ---\n"
                 f"Steps used: {steps_used}/{max_steps}\n"
                 f"Steps remaining: {steps_remaining}\n"
@@ -881,7 +881,7 @@ def _debug_loop_impl(
     ])
     
     diagnosis_result = final_diagnosis(
-        initial_problem=initial_evidence,
+        initial_problem=session.initial_problem,
         evidence=evidence,
         probes_summary=probes_summary
     )
@@ -890,9 +890,9 @@ def _debug_loop_impl(
     # Trace final diagnosis
     trace_reasoning_step(
         step_type="final_diagnosis",
-        step_num=None,  # Final step, not part of loop
+        step_num=session.current_step + 1,  # Use current step + 1 for final diagnosis
         inputs={
-            "initial_problem": initial_evidence[:300],
+            "initial_problem": session.initial_problem[:300],
             "evidence": evidence[:500],
             "probes_summary": probes_summary[:300]
         },
@@ -926,7 +926,7 @@ def _debug_loop_impl(
         },
         "debug_session": {
             "session_id": session.session_id,
-            "initial_problem": initial_evidence,
+            "initial_problem": session.initial_problem,
             "total_steps": session.current_step,
             "probes_executed": [p.model_dump() for p in session.probe_history],
             "evidence_log": context.evidence_log,
