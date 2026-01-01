@@ -20,7 +20,7 @@ import json
 import subprocess
 
 # Add project root to path
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent  # Go up from evaluation/ to project root
 sys.path.insert(0, str(project_root))
 
 from scenarios.common.runner import (
@@ -35,7 +35,7 @@ from columbo.session_utils import (
     generate_session_report,
 )
 from columbo.ui import ColumboUI
-from columbo.evaluation_metrics import (
+from evaluation.metrics import (
     calculate_probe_recall,
     calculate_step_efficiency,
     calculate_groundedness,

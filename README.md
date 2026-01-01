@@ -223,7 +223,7 @@ python -m columbo.main_interactive
 python -m columbo.main
 
 # Evaluate on a test scenario (for development/testing)
-python evaluate_scenario.py s001_env_override --interactive
+python evaluation/evaluate_scenario.py s001_env_override --interactive
 ```
 
 The main examples will run against the bundled scenario and save:
