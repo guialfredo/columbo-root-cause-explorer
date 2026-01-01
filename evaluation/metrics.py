@@ -7,7 +7,7 @@ Metrics:
 3. Groundedness - Is the diagnosis well-supported by evidence?
 """
 
-from typing import List, Set, Dict
+from typing import List, Set, Dict, Any
 from pydantic import BaseModel, Field
 import dspy
 
@@ -80,7 +80,7 @@ def calculate_probe_recall(
 def calculate_step_efficiency(
     optimal_steps: int,
     steps_used: int,
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """
     Calculate step efficiency metrics.
     
