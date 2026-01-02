@@ -318,38 +318,47 @@ def main():
         print("LOGGING TO MLFLOW")
         print("=" * 70)
         
-        # We're already in an active run, so just log to it
-        # Log parameters
-        mlflow.log_param("scenario_id", manifest.scenario_id)
-        mlflow.log_param("scenario_title", manifest.title)
-        mlflow.log_param("category", manifest.category)
-        mlflow.log_param("difficulty", manifest.difficulty)
-        mlflow.log_param("max_steps", manifest.budgets['max_steps'])
-        mlflow.log_param("optimal_steps", manifest.budgets['optimal_steps'])
-        mlflow.log_param("llm_model", "gpt-5-mini")  # Could make this configurable
+        # Check that there is still an active MLflow run before logging
+        active_run = None
+        try:
+            active_run = mlflow.active_run()
+        except Exception:
+            active_run = None
         
-        # Log metrics
-        mlflow.log_metric("probe_recall", probe_recall.recall)
-        mlflow.log_metric("step_efficiency_score", step_efficiency['efficiency_score'])
-        mlflow.log_metric("step_efficiency_ratio", step_efficiency['efficiency_ratio'])
-        mlflow.log_metric("steps_used", step_efficiency['steps_used'])
-        mlflow.log_metric("groundedness_score", groundedness.score)
-        
-        # Log artifacts
-        mlflow.log_artifact(str(session_file))
-        mlflow.log_artifact(str(report_file))
-        mlflow.log_artifact(str(eval_file))
-        
-        # Set tags for easy filtering
-        mlflow.set_tag("category", manifest.category)
-        mlflow.set_tag("difficulty", manifest.difficulty)
-        mlflow.set_tag("expected_root_cause", manifest.grading['expected_root_cause_id'])
-        
-        # End the MLflow run
-        if mlflow_run_context:
-            mlflow_run_context.__exit__(None, None, None)
+        if not active_run:
+            print("! MLflow run is not active; skipping MLflow logging.")
+        else:
+            # Log parameters
+            mlflow.log_param("scenario_id", manifest.scenario_id)
+            mlflow.log_param("scenario_title", manifest.title)
+            mlflow.log_param("category", manifest.category)
+            mlflow.log_param("difficulty", manifest.difficulty)
+            mlflow.log_param("max_steps", manifest.budgets['max_steps'])
+            mlflow.log_param("optimal_steps", manifest.budgets['optimal_steps'])
+            mlflow.log_param("llm_model", "gpt-5-mini")  # Could make this configurable
             
-        print("✓ Logged to MLflow")
+            # Log metrics
+            mlflow.log_metric("probe_recall", probe_recall.recall)
+            mlflow.log_metric("step_efficiency_score", step_efficiency['efficiency_score'])
+            mlflow.log_metric("step_efficiency_ratio", step_efficiency['efficiency_ratio'])
+            mlflow.log_metric("steps_used", step_efficiency['steps_used'])
+            mlflow.log_metric("groundedness_score", groundedness.score)
+            
+            # Log artifacts
+            mlflow.log_artifact(str(session_file))
+            mlflow.log_artifact(str(report_file))
+            mlflow.log_artifact(str(eval_file))
+            
+            # Set tags for easy filtering
+            mlflow.set_tag("category", manifest.category)
+            mlflow.set_tag("difficulty", manifest.difficulty)
+            mlflow.set_tag("expected_root_cause", manifest.grading['expected_root_cause_id'])
+            
+            # End the MLflow run
+            if mlflow_run_context and active_run is not None:
+                mlflow_run_context.__exit__(None, None, None)
+            
+            print("✓ Logged to MLflow")
     
     # Tear down scenario
     if compose_spec and not args.no_teardown:
