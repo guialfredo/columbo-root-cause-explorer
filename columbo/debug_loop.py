@@ -14,6 +14,8 @@ from columbo.modules import (
 )
 from columbo.probes import probe_registry, PROBE_DEPENDENCIES, build_tools_spec, validate_probe_args, PROBE_SCHEMAS
 from columbo.probes import sanitize_probe_args
+from columbo.probes.runtime import invoke_probe
+from columbo.probes.spec import PROBES
 from columbo.schemas import (
     DebugSession,
     ProbeCall,
@@ -30,6 +32,23 @@ from columbo.tracing import (
 from pathlib import Path
 import uuid
 from typing import Dict, Any, Optional, List
+
+
+# Derive container probe categories from metadata (single source of truth)
+# Multi-container probes: container-scoped probes that take a list of containers
+_MULTI_CONTAINER_PROBES = {
+    name for name, spec in PROBES.items()
+    if spec.scope == "container" and "container" not in spec.required_args
+}
+
+# Single-container probes: container-scoped probes that require a single container
+_SINGLE_CONTAINER_PROBES = {
+    name for name, spec in PROBES.items()
+    if spec.scope == "container" and "container" in spec.required_args
+}
+
+# All container probes (union of both categories)
+_ALL_CONTAINER_PROBES = _MULTI_CONTAINER_PROBES | _SINGLE_CONTAINER_PROBES
 
 
 class DebugContext:
@@ -233,199 +252,25 @@ def execute_probe(
         }
     
     try:
+        # Discover containers if needed for container-scoped probes
+        containers, client = None, None
+        if probe_name in _ALL_CONTAINER_PROBES:
+            containers, client = container_cache.discover(context)
+            if not containers:
+                return {
+                    "error": "No containers available or failed to connect to Docker",
+                    "probe_name": probe_name
+                }
+        
         # Handle different probe types
-        if probe_name == "containers_state":
-            # Discover containers on demand when this probe is called
-            containers, _ = container_cache.discover(context)
-            if not containers:
-                return {
-                    "error": "No containers available or failed to connect to Docker",
-                    "probe_name": probe_name
-                }
+        if probe_name in _MULTI_CONTAINER_PROBES:
+            # Multi-container probes (e.g., containers_state, containers_ports)
             result = probe_func(containers, probe_name=probe_name)
         
-        elif probe_name == "containers_ports":
-            # Discover containers on demand for port inspection
-            containers, _ = container_cache.discover(context)
-            if not containers:
-                return {
-                    "error": "No containers available or failed to connect to Docker",
-                    "probe_name": probe_name
-                }
-            result = probe_func(containers, probe_name=probe_name)
-        
-        elif probe_name == "container_inspect":
-            container_name = args.get("container") or args.get("container_name")
-            
-            if not container_name:
-                return {
-                    "error": "Missing container name argument",
-                    "probe_name": probe_name,
-                }
-            
-            # Discover containers on demand
-            containers, _ = container_cache.discover(context)
-            if not containers:
-                return {
-                    "error": "No containers available or failed to connect to Docker",
-                    "probe_name": probe_name,
-                }
-            
-            # Find the container by name
-            target_container = None
-            for c in containers:
-                if c.name == container_name:
-                    target_container = c
-                    break
-            
-            if not target_container:
-                return {
-                    "error": f"Container '{container_name}' not found",
-                    "available_containers": [c.name for c in containers],
-                    "probe_name": probe_name,
-                }
-            
-            result = probe_func(target_container, probe_name=probe_name)
-            
-        elif probe_name == "container_logs":
-            container_name = args.get("container") or args.get("container_name")
-            tail = args.get("tail", 50)
-            
-            if not container_name:
-                return {
-                    "error": "Missing container name argument",
-                    "probe_name": probe_name,
-                }
-            
-            # Discover containers on demand
-            containers, _ = container_cache.discover(context)
-            if not containers:
-                return {
-                    "error": "No containers available or failed to connect to Docker",
-                    "probe_name": probe_name,
-                }
-            
-            # Find the container by name
-            target_container = None
-            for c in containers:
-                if c.name == container_name:
-                    target_container = c
-                    break
-            
-            if not target_container:
-                return {
-                    "error": f"Container '{container_name}' not found",
-                    "available_containers": [c.name for c in containers],
-                    "probe_name": probe_name,
-                }
-            
-            result = probe_func(target_container, tail=tail, probe_name=probe_name)
-            
-        elif probe_name == "container_exec":
-            container_name = args.get("container") or args.get("container_name")
-            command = args.get("command")
-            
-            if not container_name:
-                return {
-                    "error": "Missing container name argument",
-                    "probe_name": probe_name,
-                }
-            
-            if not command:
-                return {
-                    "error": "Missing command argument",
-                    "probe_name": probe_name,
-                }
-            
-            # Discover containers on demand
-            containers, _ = container_cache.discover(context)
-            if not containers:
-                return {
-                    "error": "No containers available or failed to connect to Docker",
-                    "probe_name": probe_name,
-                }
-            
-            # Find the container by name
-            target_container = None
-            for c in containers:
-                if c.name == container_name:
-                    target_container = c
-                    break
-            
-            if not target_container:
-                return {
-                    "error": f"Container '{container_name}' not found",
-                    "available_containers": [c.name for c in containers],
-                    "probe_name": probe_name,
-                }
-            
-            result = probe_func(target_container, command=command, probe_name=probe_name)
-            
-        elif probe_name == "container_mounts":
-            container_name = args.get("container") or args.get("container_name")
-            
-            if not container_name:
-                return {
-                    "error": "Missing container name argument",
-                    "probe_name": probe_name,
-                }
-            
-            # Discover containers on demand
-            containers, _ = container_cache.discover(context)
-            if not containers:
-                return {
-                    "error": "No containers available or failed to connect to Docker",
-                    "probe_name": probe_name,
-                }
-            
-            # Find the container by name
-            target_container = None
-            for c in containers:
-                if c.name == container_name:
-                    target_container = c
-                    break
-            
-            if not target_container:
-                return {
-                    "error": f"Container '{container_name}' not found",
-                    "available_containers": [c.name for c in containers],
-                    "probe_name": probe_name,
-                }
-            
-            result = probe_func(target_container, probe_name=probe_name)
-            
-        elif probe_name == "inspect_container_runtime_uid":
-            container_name = args.get("container") or args.get("container_name")
-            
-            if not container_name:
-                return {
-                    "error": "Missing container name argument",
-                    "probe_name": probe_name,
-                }
-            
-            # Discover containers on demand
-            containers, _ = container_cache.discover(context)
-            if not containers:
-                return {
-                    "error": "No containers available or failed to connect to Docker",
-                    "probe_name": probe_name,
-                }
-            
-            # Find the container by name
-            target_container = None
-            for c in containers:
-                if c.name == container_name:
-                    target_container = c
-                    break
-            
-            if not target_container:
-                return {
-                    "error": f"Container '{container_name}' not found",
-                    "available_containers": [c.name for c in containers],
-                    "probe_name": probe_name,
-                }
-            
-            result = probe_func(target_container, probe_name=probe_name)
+        elif probe_name in _SINGLE_CONTAINER_PROBES:
+            # Single-container probes - use runtime for resolution
+            args["probe_name"] = probe_name
+            result = invoke_probe(probe_func, args, client, containers)
             
         elif probe_name in ["dns_resolution", "tcp_connection", "http_connection"]:
             # Network probes - pass args directly

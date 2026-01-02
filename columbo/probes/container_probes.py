@@ -58,7 +58,7 @@ def containers_state_probe(containers: List[Container], probe_name: str = "conta
     scope="container",
     tags={"logs"},
     args={
-        "container": "Name of the container (required)",
+        "container": "Container name or ID (required)",
         "tail": "Number of log lines to retrieve (default: 50)"
     },
     required_args={"container"},
@@ -113,7 +113,7 @@ def container_logs_probe(container: Container, tail=50, probe_name: str = "conta
     scope="container",
     tags={"exec", "command"},
     args={
-        "container": "Name of the container (required)",
+        "container": "Container name or ID (required)",
         "command": "Shell command to run (required). Should be read-only or diagnostic in nature.",
         "tail_chars": "Max characters to keep from stdout/stderr (default: 4000)"
     },
@@ -196,7 +196,7 @@ def container_exec_probe(
     scope="container",
     tags={"mounts", "volumes"},
     args={
-        "container": "Name of the container to inspect (required)"
+        "container": "Container name or ID to inspect (required)"
     },
     required_args={"container"},
     example='{"container": "s003_app"}'
@@ -358,7 +358,7 @@ def containers_ports_probe(containers: List[Container], probe_name: str = "conta
     scope="container",
     tags={"inspect", "state", "config"},
     args={
-        "container": "Name of the container to inspect (required)"
+        "container": "Container name or ID to inspect (required)"
     },
     required_args={"container"},
     example='{"container": "data_processor_dev"}'
@@ -430,7 +430,7 @@ def container_inspect_probe(container: Container, probe_name: str = "container_i
     scope="container",
     tags={"permissions", "uid", "security"},
     args={
-        "container": "Name or ID of the running container to inspect (required)"
+        "container": "Container name or ID of the running container to inspect (required)"
     },
     required_args={"container"},
     example='{"container": "s005_worker"}'
