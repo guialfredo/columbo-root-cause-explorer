@@ -1,5 +1,6 @@
 """Utility functions for probe management, validation, and documentation."""
 
+from .spec import PROBES
 from .registry import probe_registry, PROBE_SCHEMAS
 
 
