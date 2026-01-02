@@ -1,7 +1,9 @@
 """Volume-related probes for inspecting Docker volumes and their contents."""
 
+from columbo.schemas import ProbeResult
 
-def list_volumes_probe(probe_name: str = "list_volumes"):
+
+def list_volumes_probe(probe_name: str = "list_volumes") -> ProbeResult:
     """List all Docker volumes on the local system.
     
     Use this probe to discover what volumes exist, which can help identify:
@@ -22,22 +24,27 @@ def list_volumes_probe(probe_name: str = "list_volumes"):
         volumes = client.volumes.list()
         volume_names = [vol.name for vol in volumes]
 
-        return {
-            "volume_count": len(volume_names),
-            "volumes": volume_names,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "volume_count": len(volume_names),
+                "volumes": volume_names,
+            }
+        )
     except Exception as e:
-        return {
-            "volume_count": 0,
-            "volumes": [],
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "volume_count": 0,
+                "volumes": [],
+            }
+        )
 
 
-def volume_metadata_probe(volume_name: str, probe_name: str = "volume_metadata"):
+def volume_metadata_probe(volume_name: str, probe_name: str = "volume_metadata") -> ProbeResult:
     """Retrieve detailed metadata for a specific Docker volume.
     
     Critical for diagnosing stale volume issues. Returns:
@@ -67,23 +74,28 @@ def volume_metadata_probe(volume_name: str, probe_name: str = "volume_metadata")
         driver = volume_attrs.get("Driver", "unknown")
         mountpoint = volume_attrs.get("Mountpoint", "unknown")
 
-        return {
-            "volume_name": volume_name,
-            "created_at": created_at,
-            "labels": labels,
-            "driver": driver,
-            "mountpoint": mountpoint,
-            "volume_attrs": volume_attrs,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "volume_name": volume_name,
+                "created_at": created_at,
+                "labels": labels,
+                "driver": driver,
+                "mountpoint": mountpoint,
+                "volume_attrs": volume_attrs,
+            }
+        )
     except Exception as e:
-        return {
-            "volume_name": volume_name,
-            "volume_attrs": None,
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "volume_name": volume_name,
+                "volume_attrs": None,
+            }
+        )
 
 
 def volume_data_inspection_probe(
@@ -91,7 +103,7 @@ def volume_data_inspection_probe(
     sample_path: str = "/",
     max_items: int = 10,
     probe_name: str = "volume_data_inspection",
-):
+) -> ProbeResult:
     """Safely inspect the contents of a Docker volume without modifying it.
     
     Creates a temporary read-only Alpine container to peek into volume contents.
@@ -125,14 +137,16 @@ def volume_data_inspection_probe(
         try:
             client.images.pull(image_name)
         except Exception as pull_error:
-            return {
-                "volume_name": volume_name,
-                "sample_path": sample_path,
-                "file_listing": None,
-                "probe_name": probe_name,
-                "error": f"Failed to pull {image_name}: {str(pull_error)}",
-                "error_type": "image_pull_error",
-            }
+            return ProbeResult(
+                probe_name=probe_name,
+                success=False,
+                error=f"Failed to pull {image_name}: {str(pull_error)}",
+                data={
+                    "volume_name": volume_name,
+                    "sample_path": sample_path,
+                    "file_listing": None,
+                }
+            )
         
         volume = client.volumes.get(volume_name)
 
@@ -153,21 +167,26 @@ def volume_data_inspection_probe(
         lines = raw_output.splitlines()
         output = "\n".join(lines[:max_items]) if max_items > 0 else raw_output
 
-        return {
-            "volume_name": volume_name,
-            "sample_path": sample_path,
-            "file_listing": output,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "volume_name": volume_name,
+                "sample_path": sample_path,
+                "file_listing": output,
+            }
+        )
     except Exception as e:
-        return {
-            "volume_name": volume_name,
-            "sample_path": sample_path,
-            "file_listing": None,
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "volume_name": volume_name,
+                "sample_path": sample_path,
+                "file_listing": None,
+            }
+        )
     finally:
         # Ensure cleanup even on error
         if temp_container:
@@ -183,7 +202,7 @@ def volume_file_read_probe(
     file_path: str,
     max_bytes: int = 4000,
     probe_name: str = "volume_file_read",
-):
+) -> ProbeResult:
     """Read the contents of a specific file from a Docker volume.
     
     Creates a temporary read-only Alpine container to safely read file contents
@@ -220,16 +239,18 @@ def volume_file_read_probe(
         try:
             client.images.pull(image_name)
         except Exception as pull_error:
-            return {
-                "volume_name": volume_name,
-                "file_path": file_path,
-                "exists": False,
-                "file_contents": None,
-                "file_size": None,
-                "probe_name": probe_name,
-                "error": f"Failed to pull {image_name}: {str(pull_error)}",
-                "error_type": "image_pull_error",
-            }
+            return ProbeResult(
+                probe_name=probe_name,
+                success=False,
+                error=f"Failed to pull {image_name}: {str(pull_error)}",
+                data={
+                    "volume_name": volume_name,
+                    "file_path": file_path,
+                    "exists": False,
+                    "file_contents": None,
+                    "file_size": None,
+                }
+            )
         
         volume = client.volumes.get(volume_name)
 
@@ -247,14 +268,17 @@ def volume_file_read_probe(
         exists_check = "exists" if check_log.exit_code == 0 else "missing"
         
         if exists_check != "exists":
-            return {
-                "volume_name": volume_name,
-                "file_path": file_path,
-                "exists": False,
-                "file_contents": None,
-                "file_size": None,
-                "probe_name": probe_name,
-            }
+            return ProbeResult(
+                probe_name=probe_name,
+                success=True,
+                data={
+                    "volume_name": volume_name,
+                    "file_path": file_path,
+                    "exists": False,
+                    "file_contents": None,
+                    "file_size": None,
+                }
+            )
 
         # Get file size using argument list to prevent shell injection
         size_log = temp_container.exec_run(["wc", "-c", f"/mnt{file_path}"])
@@ -268,26 +292,31 @@ def volume_file_read_probe(
         
         truncated = file_size > max_bytes
 
-        return {
-            "volume_name": volume_name,
-            "file_path": file_path,
-            "exists": True,
-            "file_contents": contents,
-            "file_size": file_size,
-            "truncated": truncated,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "volume_name": volume_name,
+                "file_path": file_path,
+                "exists": True,
+                "file_contents": contents,
+                "file_size": file_size,
+                "truncated": truncated,
+            }
+        )
     except Exception as e:
-        return {
-            "volume_name": volume_name,
-            "file_path": file_path,
-            "exists": False,
-            "file_contents": None,
-            "file_size": None,
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "volume_name": volume_name,
+                "file_path": file_path,
+                "exists": False,
+                "file_contents": None,
+                "file_size": None,
+            }
+        )
     finally:
         # Ensure cleanup even on error
         if temp_container:
@@ -302,7 +331,7 @@ def inspect_volume_file_permissions(
     volume_name: str,
     path_in_volume: str = "/",
     probe_name: str = "inspect_volume_file_permissions",
-):
+) -> ProbeResult:
     """Inspect file ownership and permissions within a Docker volume.
     
     Creates a temporary read-only Alpine container to examine the UID/GID
@@ -341,14 +370,16 @@ def inspect_volume_file_permissions(
         try:
             client.images.pull(image_name)
         except Exception as pull_error:
-            return {
-                "volume_name": volume_name,
-                "path_in_volume": path_in_volume,
-                "permissions_listing": None,
-                "probe_name": probe_name,
-                "error": f"Failed to pull {image_name}: {str(pull_error)}",
-                "error_type": "image_pull_error",
-            }
+            return ProbeResult(
+                probe_name=probe_name,
+                success=False,
+                error=f"Failed to pull {image_name}: {str(pull_error)}",
+                data={
+                    "volume_name": volume_name,
+                    "path_in_volume": path_in_volume,
+                    "permissions_listing": None,
+                }
+            )
         
         volume = client.volumes.get(volume_name)
 
@@ -365,21 +396,26 @@ def inspect_volume_file_permissions(
         exec_log = temp_container.exec_run(["ls", "-lna", f"/mnt{path_in_volume}"])
         permissions_output = exec_log.output.decode("utf-8", errors="replace")
 
-        return {
-            "volume_name": volume_name,
-            "path_in_volume": path_in_volume,
-            "permissions_listing": permissions_output,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "volume_name": volume_name,
+                "path_in_volume": path_in_volume,
+                "permissions_listing": permissions_output,
+            }
+        )
     except Exception as e:
-        return {
-            "volume_name": volume_name,
-            "path_in_volume": path_in_volume,
-            "permissions_listing": None,
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "volume_name": volume_name,
+                "path_in_volume": path_in_volume,
+                "permissions_listing": None,
+            }
+        )
     finally:
         # Ensure cleanup even on error
         if temp_container:

@@ -180,6 +180,40 @@ class DiagnosisResult(BaseModel):
 # Core Domain Models
 # ============================================================================
 
+class ProbeResult(BaseModel):
+    """Typed output from a probe execution.
+    
+    All probes MUST return this schema. This enforces deterministic structure
+    and separates raw infrastructure data (probes) from interpreted evidence (Finding).
+    
+    Design principles:
+    - probe_name: identifies which probe ran
+    - success: True if probe executed without error (even if findings are negative)
+    - error: populated only if probe execution itself failed
+    - data: probe-specific structured output (open dict for flexibility)
+    """
+    model_config = ConfigDict(extra="forbid")
+    
+    probe_name: str = Field(..., min_length=1, description="Name of the probe that produced this result")
+    success: bool = Field(default=True, description="Whether probe executed successfully (not whether it found issues)")
+    error: Optional[str] = Field(default=None, description="Error message if probe execution failed")
+    data: Dict[str, Any] = Field(
+        default_factory=dict,
+        description="Probe-specific structured data (e.g., {'container': 'api', 'status': 'running'})"
+    )
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Flatten to dict for backward compatibility with LLM ingestion.
+        
+        Merges probe_name, success, error into data dict for seamless consumption.
+        """
+        result = {"probe_name": self.probe_name, "success": self.success}
+        if self.error:
+            result["error"] = self.error
+        result.update(self.data)
+        return result
+
+
 class ProbeCall(BaseModel):
     """One executed probe call."""
     model_config = ConfigDict(extra="forbid")
