@@ -61,10 +61,9 @@ def invoke_probe(
         containers: List of available containers for resolution
         
     Returns:
-        Probe result dictionary
-        
-    Raises:
-        ValueError: If container resolution is needed but client/containers not provided
+        Probe result dictionary. If an error occurs (container not found,
+        missing client/containers), returns a structured error dict instead
+        of raising exceptions, consistent with probe guidelines.
     """
     # Make a copy to avoid mutating the original args
     resolved_args = args.copy()
@@ -74,9 +73,11 @@ def invoke_probe(
     
     if container_ref and isinstance(container_ref, str):
         if not client or not containers:
-            raise ValueError(
-                "Container resolution requested but client or containers not provided"
-            )
+            # Return error instead of raising exception (probes must not raise)
+            return {
+                "error": "Container resolution requested but client or containers not provided",
+                "probe_name": args.get("probe_name", "unknown"),
+            }
         
         resolved_container = resolve_container(client, containers, container_ref)
         if not resolved_container:
