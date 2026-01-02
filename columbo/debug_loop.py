@@ -15,6 +15,7 @@ from columbo.modules import (
 from columbo.probes import probe_registry, PROBE_DEPENDENCIES, build_tools_spec, validate_probe_args, PROBE_SCHEMAS
 from columbo.probes import sanitize_probe_args
 from columbo.probes.runtime import invoke_probe
+from columbo.probes.spec import PROBES
 from columbo.schemas import (
     DebugSession,
     ProbeCall,
@@ -31,6 +32,23 @@ from columbo.tracing import (
 from pathlib import Path
 import uuid
 from typing import Dict, Any, Optional, List
+
+
+# Derive container probe categories from metadata (single source of truth)
+# Multi-container probes: container-scoped probes that take a list of containers
+_MULTI_CONTAINER_PROBES = {
+    name for name, spec in PROBES.items()
+    if spec.scope == "container" and "container" not in spec.required_args
+}
+
+# Single-container probes: container-scoped probes that require a single container
+_SINGLE_CONTAINER_PROBES = {
+    name for name, spec in PROBES.items()
+    if spec.scope == "container" and "container" in spec.required_args
+}
+
+# All container probes (union of both categories)
+_ALL_CONTAINER_PROBES = _MULTI_CONTAINER_PROBES | _SINGLE_CONTAINER_PROBES
 
 
 class DebugContext:
@@ -236,11 +254,7 @@ def execute_probe(
     try:
         # Discover containers if needed for container-scoped probes
         containers, client = None, None
-        if probe_name in [
-            "containers_state", "containers_ports",
-            "container_inspect", "container_logs", "container_exec",
-            "container_mounts", "inspect_container_runtime_uid"
-        ]:
+        if probe_name in _ALL_CONTAINER_PROBES:
             containers, client = container_cache.discover(context)
             if not containers:
                 return {
@@ -249,14 +263,11 @@ def execute_probe(
                 }
         
         # Handle different probe types
-        if probe_name in ["containers_state", "containers_ports"]:
-            # Multi-container probes
+        if probe_name in _MULTI_CONTAINER_PROBES:
+            # Multi-container probes (e.g., containers_state, containers_ports)
             result = probe_func(containers, probe_name=probe_name)
         
-        elif probe_name in [
-            "container_inspect", "container_logs", "container_exec",
-            "container_mounts", "inspect_container_runtime_uid"
-        ]:
+        elif probe_name in _SINGLE_CONTAINER_PROBES:
             # Single-container probes - use runtime for resolution
             args["probe_name"] = probe_name
             result = invoke_probe(probe_func, args, client, containers)
