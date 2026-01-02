@@ -74,7 +74,7 @@ def invoke_with_container_resolution(
     container_ref = resolved_args.get("container")
     
     if container_ref and isinstance(container_ref, str):
-        if not client or not containers:
+        if client is None or containers is None:
             # Return ProbeResult with error instead of raising exception
             return ProbeResult(
                 probe_name=args.get("probe_name", "unknown"),
