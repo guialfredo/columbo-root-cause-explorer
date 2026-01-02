@@ -5,8 +5,20 @@ import time
 import requests
 
 from columbo.schemas import ProbeResult
+from .spec import probe
 
 
+@probe(
+    name="dns_resolution",
+    description="Resolve a hostname to IP addresses",
+    scope="network",
+    tags={"dns", "connectivity"},
+    args={
+        "hostname": "Hostname to resolve (required)"
+    },
+    required_args={"hostname"},
+    example='{"hostname": "localhost"}'
+)
 def dns_resolution_probe(hostname: str, probe_name: str = "dns_resolution") -> ProbeResult:
     """Resolve a hostname to IP addresses.
     
@@ -42,6 +54,19 @@ def dns_resolution_probe(hostname: str, probe_name: str = "dns_resolution") -> P
         )
 
 
+@probe(
+    name="tcp_connection",
+    description="Test TCP connection to a host and port",
+    scope="network",
+    tags={"tcp", "connectivity"},
+    args={
+        "host": "Target host (required)",
+        "port": "Target port number (required)",
+        "timeout": "Connection timeout in seconds (default: 5.0)"
+    },
+    required_args={"host", "port"},
+    example='{"host": "localhost", "port": 8000}'
+)
 def tcp_connection_probe(
     host: str, port: int, timeout: float = 5.0, probe_name: str = "tcp_connection"
 ) -> ProbeResult:
@@ -72,6 +97,18 @@ def tcp_connection_probe(
         )
 
 
+@probe(
+    name="http_connection",
+    description="Test HTTP connection to a URL",
+    scope="network",
+    tags={"http", "connectivity"},
+    args={
+        "url": "Full URL to test (required)",
+        "timeout": "Request timeout in seconds (default: 5.0)"
+    },
+    required_args={"url"},
+    example='{"url": "http://localhost:8000/health"}'
+)
 def http_connection_probe(
     url: str, timeout: float = 5.0, probe_name: str = "http_connection"
 ) -> ProbeResult:
