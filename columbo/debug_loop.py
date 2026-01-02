@@ -14,7 +14,7 @@ from columbo.modules import (
 )
 from columbo.probes import probe_registry, PROBE_DEPENDENCIES, build_tools_spec, validate_probe_args, PROBE_SCHEMAS
 from columbo.probes import sanitize_probe_args
-from columbo.probes.runtime import invoke_probe
+from columbo.probes.runtime import invoke_with_container_resolution
 from columbo.probes.spec import PROBES
 from columbo.schemas import (
     DebugSession,
@@ -23,6 +23,7 @@ from columbo.schemas import (
     Hypothesis,
     ConfidenceLevel,
     Severity,
+    ProbeResult,
 )
 from columbo.tracing import (
     trace_session,
@@ -270,7 +271,9 @@ def execute_probe(
         elif probe_name in _SINGLE_CONTAINER_PROBES:
             # Single-container probes - use runtime for resolution
             args["probe_name"] = probe_name
-            result = invoke_probe(probe_func, args, client, containers)
+            probe_result = invoke_with_container_resolution(probe_func, args, client, containers)
+            # Convert ProbeResult to dict for backward compatibility
+            result = probe_result.to_dict() if isinstance(probe_result, ProbeResult) else probe_result
             
         elif probe_name in ["dns_resolution", "tcp_connection", "http_connection"]:
             # Network probes - pass args directly
