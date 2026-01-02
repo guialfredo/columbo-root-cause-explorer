@@ -1,38 +1,22 @@
-"""Probe registry and schemas - declarative definitions of all available probes.
+"""Probe registry - backward compatibility layer.
 
-This module now maintains backward compatibility while transitioning to ProbeSpec.
-New code should use PROBES from spec.py, but probe_registry and PROBE_SCHEMAS
-are maintained for compatibility.
+This module ensures all probe modules are imported (triggering @probe decorators)
+and provides backward-compatible exports derived from the canonical PROBES registry.
+
+New code should import from spec.py (PROBES) directly.
+This module exists solely for backward compatibility.
 """
 
+# Import probe modules to trigger @probe decorator registration
+# This populates the PROBES dict in spec.py
+# NOTE: Must use relative imports to avoid circular dependency with __init__.py
+from . import container_probes  # noqa: F401
+from . import volume_probes  # noqa: F401
+from . import network_probes  # noqa: F401
+from . import config_probes  # noqa: F401
+
+# Import the canonical registry
 from .spec import PROBES
-from .container_probes import (
-    containers_state_probe,
-    container_logs_probe,
-    container_exec_probe,
-    container_mounts_probe,
-    containers_ports_probe,
-    container_inspect_probe,
-    inspect_container_runtime_uid,
-)
-from .volume_probes import (
-    list_volumes_probe,
-    volume_metadata_probe,
-    volume_data_inspection_probe,
-    volume_file_read_probe,
-    inspect_volume_file_permissions,
-)
-from .network_probes import (
-    dns_resolution_probe,
-    tcp_connection_probe,
-    http_connection_probe,
-)
-from .config_probes import (
-    detect_config_files_probe,
-    env_files_parsing_probe,
-    docker_compose_parsing_probe,
-    generic_config_parsing_probe,
-)
 
 
 # Backward compatible probe registry mapping names to functions
