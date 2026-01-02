@@ -3,12 +3,14 @@
 from pathlib import Path
 import yaml
 
+from columbo.schemas import ProbeResult
+
 
 def detect_config_files_probe(
     root_path: str | Path,
     probe_name: str = "config_files_detection",
     max_depth: int = 3,
-):
+) -> ProbeResult:
     """Detect configuration files commonly used in containerized applications.
     
     Args:
@@ -37,13 +39,16 @@ def detect_config_files_probe(
     try:
         root = Path(root_path)
         if not root.exists():
-            return {
-                "root_path": str(root_path),
-                "found_files": [],
-                "ok": False,
-                "probe_name": probe_name,
-                "error": "Root path does not exist",
-            }
+            return ProbeResult(
+                probe_name=probe_name,
+                success=False,
+                error="Root path does not exist",
+                data={
+                    "root_path": str(root_path),
+                    "found_files": [],
+                    "ok": False,
+                }
+            )
         
         found_files = []
         scanned_dirs = 0
@@ -88,28 +93,33 @@ def detect_config_files_probe(
                 # Skip files/dirs we can't access
                 continue
         
-        return {
-            "root_path": str(root_path),
-            "found_files": found_files,
-            "count": len(found_files),
-            "scanned_dirs": scanned_dirs,
-            "max_depth": max_depth,
-            "ok": True,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "root_path": str(root_path),
+                "found_files": found_files,
+                "count": len(found_files),
+                "scanned_dirs": scanned_dirs,
+                "max_depth": max_depth,
+                "ok": True,
+            }
+        )
         
     except Exception as e:
-        return {
-            "root_path": str(root_path),
-            "found_files": [],
-            "ok": False,
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "root_path": str(root_path),
+                "found_files": [],
+                "ok": False,
+            }
+        )
 
 
-def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing"):
+def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing") -> ProbeResult:
     """Parse environment variable files (.env, environment.yml/yaml) to extract variables.
     
     Args:
@@ -168,17 +178,19 @@ def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing"):
                 "variable_count": 0,
                 "parsed": False,
                 "error": str(e),
-                "error_type": type(e).__name__,
             })
     
-    return {
-        "parsed_env_files": parsed_envs,
-        "total_files": len(parsed_envs),
-        "probe_name": probe_name,
-    }
+    return ProbeResult(
+        probe_name=probe_name,
+        success=True,
+        data={
+            "parsed_env_files": parsed_envs,
+            "total_files": len(parsed_envs),
+        }
+    )
 
 
-def docker_compose_parsing_probe(found_files, probe_name: str = "docker_compose_parsing"):
+def docker_compose_parsing_probe(found_files, probe_name: str = "docker_compose_parsing") -> ProbeResult:
     """Parse docker-compose files to extract service definitions.
     
     Args:
@@ -214,17 +226,19 @@ def docker_compose_parsing_probe(found_files, probe_name: str = "docker_compose_
                 "service_count": 0,
                 "parsed": False,
                 "error": str(e),
-                "error_type": type(e).__name__,
             })
     
-    return {
-        "parsed_compose_files": parsed_compose_files,
-        "total_files": len(parsed_compose_files),
-        "probe_name": probe_name,
-    }
+    return ProbeResult(
+        probe_name=probe_name,
+        success=True,
+        data={
+            "parsed_compose_files": parsed_compose_files,
+            "total_files": len(parsed_compose_files),
+        }
+    )
 
 
-def generic_config_parsing_probe(found_files, probe_name: str = "generic_config_parsing"):
+def generic_config_parsing_probe(found_files, probe_name: str = "generic_config_parsing") -> ProbeResult:
     """Parse generic configuration files (YAML/JSON) to extract settings.
     
     Args:
@@ -264,8 +278,11 @@ def generic_config_parsing_probe(found_files, probe_name: str = "generic_config_
             "error": error,
         })
     
-    return {
-        "parsed_config_files": parsed_configs,
-        "total_files": len(parsed_configs),
-        "probe_name": probe_name,
-    }
+    return ProbeResult(
+        probe_name=probe_name,
+        success=True,
+        data={
+            "parsed_config_files": parsed_configs,
+            "total_files": len(parsed_configs),
+        }
+    )
