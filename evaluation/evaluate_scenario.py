@@ -192,28 +192,36 @@ def main():
         ui = ColumboUI(max_steps=manifest.budgets['max_steps'], verbose=False)
         ui.start()
     
+    # Start MLflow run before debug_loop if tracking is enabled
+    # This allows traces/spans to be captured during debugging
+    mlflow_run_context = None
+    if mlflow_enabled:
+        mlflow_run_context = mlflow.start_run(run_name=f"{args.scenario_id}_{time.time():.0f}")
+        mlflow_run_context.__enter__()
+    
     try:
-        result = debug_loop(
-            initial_evidence=initial_evidence,
-            max_steps=manifest.budgets['max_steps'],
-            workspace_root=str(scenario_ref.scenario_dir),
-            ui_callback=ui,
-            verbose=not args.interactive,  # Suppress logs in interactive mode
-        )
-        
-        diagnosis = result["diagnosis"]
-        session_model = result["session_model"]
-        
-        # Stop UI if interactive
-        if ui:
-            ui.stop()
-        
-    except Exception as e:
-        print(f"ERROR during debugging: {e}")
-        if compose_spec and not args.no_teardown:
-            print("\nTearing down scenario...")
-            tear_down_scenario(compose_spec)
-        return 1
+        try:
+            result = debug_loop(
+                initial_evidence=initial_evidence,
+                max_steps=manifest.budgets['max_steps'],
+                workspace_root=str(scenario_ref.scenario_dir),
+                ui_callback=ui,
+                verbose=not args.interactive,  # Suppress logs in interactive mode
+            )
+            
+            diagnosis = result["diagnosis"]
+            session_model = result["session_model"]
+            
+            # Stop UI if interactive
+            if ui:
+                ui.stop()
+            
+        except Exception as e:
+            print(f"ERROR during debugging: {e}")
+            if compose_spec and not args.no_teardown:
+                print("\nTearing down scenario...")
+                tear_down_scenario(compose_spec)
+            return 1
     
     # Evaluate results
     print(f"\n{'=' * 70}")
@@ -309,7 +317,16 @@ def main():
         print("LOGGING TO MLFLOW")
         print("=" * 70)
         
-        with mlflow.start_run(run_name=f"{args.scenario_id}_{session_model.session_id}"):
+        # Check that there is still an active MLflow run before logging
+        active_run = None
+        try:
+            active_run = mlflow.active_run()
+        except Exception:
+            active_run = None
+        
+        if not active_run:
+            print("! MLflow run is not active; skipping MLflow logging.")
+        else:
             # Log parameters
             mlflow.log_param("scenario_id", manifest.scenario_id)
             mlflow.log_param("scenario_title", manifest.title)
@@ -327,7 +344,7 @@ def main():
             mlflow.log_metric("groundedness_score", groundedness.score)
             
             # Log artifacts
-            mlflow.log_artifact(session_file)
+            mlflow.log_artifact(str(session_file))
             mlflow.log_artifact(str(report_file))
             mlflow.log_artifact(str(eval_file))
             
@@ -336,7 +353,7 @@ def main():
             mlflow.set_tag("difficulty", manifest.difficulty)
             mlflow.set_tag("expected_root_cause", manifest.grading['expected_root_cause_id'])
             
-        print("✓ Logged to MLflow")
+            print("✓ Logged to MLflow")
     
     # Tear down scenario
     if compose_spec and not args.no_teardown:
@@ -375,6 +392,14 @@ def main():
                     
         except Exception as e:
             print(f"ERROR tearing down scenario: {e}")
+    
+    finally:
+        # Ensure MLflow run is properly closed
+        if mlflow_run_context:
+            try:
+                mlflow_run_context.__exit__(None, None, None)
+            except Exception as e:
+                print(f"⚠️  Warning: Failed to close MLflow run: {e}")
     
     # Final summary
     print(f"\n{'=' * 70}")
