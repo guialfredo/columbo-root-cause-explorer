@@ -29,7 +29,7 @@ def trace_enabled() -> bool:
     try:
         active_run = mlflow.active_run()
         return active_run is not None
-    except:
+    except Exception:
         return False
 
 
