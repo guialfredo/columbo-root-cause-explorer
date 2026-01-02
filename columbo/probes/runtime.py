@@ -10,6 +10,8 @@ from docker import DockerClient
 from docker.models.containers import Container
 from docker.errors import NotFound, APIError
 
+from columbo.schemas import ProbeResult
+
 
 def resolve_container(
     client: DockerClient,
@@ -42,12 +44,12 @@ def resolve_container(
         return None
 
 
-def invoke_probe(
+def invoke_with_container_resolution(
     probe_func: Callable[..., Any],
     args: Dict[str, Any],
     client: Optional[DockerClient] = None,
     containers: Optional[List[Container]] = None
-) -> Dict[str, Any]:
+) -> ProbeResult:
     """Invoke a probe with automatic container resolution.
     
     If the probe expects a Container object but receives a string name/ID,
@@ -61,9 +63,9 @@ def invoke_probe(
         containers: List of available containers for resolution
         
     Returns:
-        Probe result dictionary. If an error occurs (container not found,
-        missing client/containers), returns a structured error dict instead
-        of raising exceptions, consistent with probe guidelines.
+        ProbeResult object. If an error occurs (container not found,
+        missing client/containers), returns a ProbeResult with success=False
+        and error message, consistent with probe guidelines.
     """
     # Make a copy to avoid mutating the original args
     resolved_args = args.copy()
@@ -73,27 +75,46 @@ def invoke_probe(
     
     if container_ref and isinstance(container_ref, str):
         if not client or not containers:
-            # Return error instead of raising exception (probes must not raise)
-            return {
-                "error": "Container resolution requested but client or containers not provided",
-                "probe_name": args.get("probe_name", "unknown"),
-            }
+            # Return ProbeResult with error instead of raising exception
+            return ProbeResult(
+                probe_name=args.get("probe_name", "unknown"),
+                success=False,
+                error="Container resolution requested but client or containers not provided",
+                data={}
+            )
         
         resolved_container = resolve_container(client, containers, container_ref)
         if not resolved_container:
-            # Return error instead of raising exception (probes must not raise)
-            return {
-                "error": f"Container '{container_ref}' not found",
-                "available_containers": [c.name for c in containers],
-                "probe_name": args.get("probe_name", "unknown"),
-            }
+            # Return ProbeResult with error instead of raising exception
+            return ProbeResult(
+                probe_name=args.get("probe_name", "unknown"),
+                success=False,
+                error=f"Container '{container_ref}' not found",
+                data={"available_containers": [c.name for c in containers]}
+            )
         
         resolved_args["container"] = resolved_container
     
     # Invoke the probe with resolved arguments
     result = probe_func(**resolved_args)
     
-    # Convert ProbeResult to dict if needed
-    if hasattr(result, 'model_dump'):
-        return result.model_dump()
-    return result
+    # If already a ProbeResult, return as-is
+    if isinstance(result, ProbeResult):
+        return result
+    
+    # Handle plain dict returns (shouldn't happen with proper probes, but be defensive)
+    if isinstance(result, dict):
+        return ProbeResult(
+            probe_name=result.get("probe_name", args.get("probe_name", "unknown")),
+            success=result.get("success", True),
+            error=result.get("error"),
+            data={k: v for k, v in result.items() if k not in {"probe_name", "success", "error"}}
+        )
+    
+    # Unexpected return type - wrap in error ProbeResult to maintain type contract
+    return ProbeResult(
+        probe_name=args.get("probe_name", "unknown"),
+        success=False,
+        error=f"Probe returned unexpected type: {type(result).__name__}. Expected ProbeResult.",
+        data={"unexpected_result": str(result)[:200]}
+    )
