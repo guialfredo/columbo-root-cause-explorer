@@ -9,13 +9,14 @@ This module exists solely for backward compatibility.
 
 # Import probe modules to trigger @probe decorator registration
 # This populates the PROBES dict in spec.py
-from columbo.probes import container_probes  # noqa: F401
-from columbo.probes import volume_probes  # noqa: F401
-from columbo.probes import network_probes  # noqa: F401
-from columbo.probes import config_probes  # noqa: F401
+# NOTE: Must use relative imports to avoid circular dependency with __init__.py
+from . import container_probes  # noqa: F401
+from . import volume_probes  # noqa: F401
+from . import network_probes  # noqa: F401
+from . import config_probes  # noqa: F401
 
 # Import the canonical registry
-from columbo.probes.spec import PROBES
+from .spec import PROBES
 
 
 # Backward compatible probe registry mapping names to functions
