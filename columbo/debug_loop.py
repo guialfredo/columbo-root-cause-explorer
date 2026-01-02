@@ -272,7 +272,6 @@ def execute_probe(
             # Single-container probes - use runtime for resolution
             args["probe_name"] = probe_name
             probe_result = invoke_with_container_resolution(probe_func, args, client, containers)
-            # Convert ProbeResult to dict for backward compatibility
             result = probe_result.to_dict() if isinstance(probe_result, ProbeResult) else probe_result
             
         elif probe_name in ["dns_resolution", "tcp_connection", "http_connection"]:

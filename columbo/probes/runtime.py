@@ -102,10 +102,6 @@ def invoke_with_container_resolution(
     if isinstance(result, ProbeResult):
         return result
     
-    # Convert dict to ProbeResult if needed (for backward compatibility)
-    if hasattr(result, 'model_dump'):
-        return result
-    
     # Handle plain dict returns (shouldn't happen with proper probes, but be defensive)
     if isinstance(result, dict):
         return ProbeResult(
@@ -115,4 +111,10 @@ def invoke_with_container_resolution(
             data={k: v for k, v in result.items() if k not in {"probe_name", "success", "error"}}
         )
     
-    return result
+    # Unexpected return type - wrap in error ProbeResult to maintain type contract
+    return ProbeResult(
+        probe_name=args.get("probe_name", "unknown"),
+        success=False,
+        error=f"Probe returned unexpected type: {type(result).__name__}. Expected ProbeResult.",
+        data={"unexpected_result": str(result)[:200]}
+    )
