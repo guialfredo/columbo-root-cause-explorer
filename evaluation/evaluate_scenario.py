@@ -200,29 +200,28 @@ def main():
         mlflow_run_context.__enter__()
     
     try:
-        result = debug_loop(
-            initial_evidence=initial_evidence,
-            max_steps=manifest.budgets['max_steps'],
-            workspace_root=str(scenario_ref.scenario_dir),
-            ui_callback=ui,
-            verbose=not args.interactive,  # Suppress logs in interactive mode
-        )
-        
-        diagnosis = result["diagnosis"]
-        session_model = result["session_model"]
-        
-        # Stop UI if interactive
-        if ui:
-            ui.stop()
-        
-    except Exception as e:
-        print(f"ERROR during debugging: {e}")
-        if mlflow_run_context:
-            mlflow_run_context.__exit__(None, None, None)
-        if compose_spec and not args.no_teardown:
-            print("\nTearing down scenario...")
-            tear_down_scenario(compose_spec)
-        return 1
+        try:
+            result = debug_loop(
+                initial_evidence=initial_evidence,
+                max_steps=manifest.budgets['max_steps'],
+                workspace_root=str(scenario_ref.scenario_dir),
+                ui_callback=ui,
+                verbose=not args.interactive,  # Suppress logs in interactive mode
+            )
+            
+            diagnosis = result["diagnosis"]
+            session_model = result["session_model"]
+            
+            # Stop UI if interactive
+            if ui:
+                ui.stop()
+            
+        except Exception as e:
+            print(f"ERROR during debugging: {e}")
+            if compose_spec and not args.no_teardown:
+                print("\nTearing down scenario...")
+                tear_down_scenario(compose_spec)
+            return 1
     
     # Evaluate results
     print(f"\n{'=' * 70}")
@@ -354,10 +353,6 @@ def main():
             mlflow.set_tag("difficulty", manifest.difficulty)
             mlflow.set_tag("expected_root_cause", manifest.grading['expected_root_cause_id'])
             
-            # End the MLflow run
-            if mlflow_run_context and active_run is not None:
-                mlflow_run_context.__exit__(None, None, None)
-            
             print("✓ Logged to MLflow")
     
     # Tear down scenario
@@ -397,6 +392,14 @@ def main():
                     
         except Exception as e:
             print(f"ERROR tearing down scenario: {e}")
+    
+    finally:
+        # Ensure MLflow run is properly closed
+        if mlflow_run_context:
+            try:
+                mlflow_run_context.__exit__(None, None, None)
+            except Exception as e:
+                print(f"⚠️  Warning: Failed to close MLflow run: {e}")
     
     # Final summary
     print(f"\n{'=' * 70}")
