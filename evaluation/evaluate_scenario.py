@@ -223,175 +223,175 @@ def main():
                 tear_down_scenario(compose_spec)
             return 1
     
-    # Evaluate results
-    print(f"\n{'=' * 70}")
-    print("EVALUATION RESULTS")
-    print("=" * 70)
-    
-    # Calculate step efficiency
-    step_efficiency = calculate_step_efficiency(
-        optimal_steps=manifest.budgets['optimal_steps'],
-        steps_used=session_model.current_step,
-    )
-    
-    # Calculate probe recall
-    mandatory_probes = manifest.grading.get('mandatory_probes', [])
-    probes_executed = [p.model_dump() for p in session_model.probe_history]
-    probe_recall = calculate_probe_recall(
-        mandatory_probes=mandatory_probes,
-        probes_executed=probes_executed,
-    )
-    
-    # Display metrics
-    print(f"\n📊 Step Efficiency: {step_efficiency['efficiency_score']:.2%}")
-    print(f"   Steps Used: {step_efficiency['steps_used']} (optimal: {step_efficiency['optimal_steps']})")
-    
-    print(f"\n🔍 {probe_recall}")
-    if probe_recall.mandatory_probes_missed:
-        print(f"   Missed probes: {', '.join(probe_recall.mandatory_probes_missed)}")
-    
-    # Calculate groundedness (LLM-as-judge)
-    print("\n⚖️  Evaluating groundedness...")
-    groundedness = calculate_groundedness(
-        diagnosis=diagnosis,
-        evidence_digest=session_model.evidence_digest,
-        probes_executed=probes_executed,
-    )
-    
-    print(f"\n⚖️  {groundedness}")
-    print(f"   {groundedness.justification}")
-    
-    # Combine metrics for saving
-    evaluation = {
-        "step_efficiency": step_efficiency,
-        "probe_recall": probe_recall.model_dump(),
-        "groundedness": groundedness.model_dump(),
-        "diagnosis_confidence": diagnosis["confidence"],
-    }
-    
-    print(f"\n{'=' * 70}")
-    print("DIAGNOSIS")
-    print("=" * 70)
-    print(f"\nRoot Cause:\n{diagnosis['root_cause']}")
-    print(f"\nRecommended Fixes:\n{diagnosis['recommended_fixes']}")
-    
-    print(f"\n{'=' * 70}")
-    print("EXPECTED ROOT CAUSE")
-    print("=" * 70)
-    print(f"\nID: {manifest.grading['expected_root_cause_id']}")
-    
-    # Save results
-    args.output_dir.mkdir(exist_ok=True)
-    
-    # Save session
-    session_file = save_session_to_file(
-        session_model,
-        str(args.output_dir)
-    )
-    print(f"\n💾 Session saved to: {session_file}")
-    
-    # Save report
-    report = generate_session_report(session_model)
-    report_file = args.output_dir / f"report_{session_model.session_id}.md"
-    report_file.write_text(report)
-    print(f"💾 Report saved to: {report_file}")
-    
-    # Save evaluation
-    eval_file = args.output_dir / f"evaluation_{session_model.session_id}.json"
-    eval_data = {
-        "scenario_id": manifest.scenario_id,
-        "scenario_title": manifest.title,
-        "session_id": session_model.session_id,
-        "evaluation": evaluation,
-        "diagnosis": diagnosis,
-        "expected_root_cause_id": manifest.grading['expected_root_cause_id'],
-        "mandatory_probes": mandatory_probes,
-        "timestamp": session_model.started_at.isoformat(),
-    }
-    eval_file.write_text(json.dumps(eval_data, indent=2, default=str))
-    print(f"💾 Evaluation saved to: {eval_file}")
-    
-    # Log to MLflow if tracking enabled
-    if mlflow_enabled:
+        # Evaluate results
         print(f"\n{'=' * 70}")
-        print("LOGGING TO MLFLOW")
+        print("EVALUATION RESULTS")
         print("=" * 70)
         
-        # Check that there is still an active MLflow run before logging
-        active_run = None
-        try:
-            active_run = mlflow.active_run()
-        except Exception:
+        # Calculate step efficiency
+        step_efficiency = calculate_step_efficiency(
+            optimal_steps=manifest.budgets['optimal_steps'],
+            steps_used=session_model.current_step,
+        )
+        
+        # Calculate probe recall
+        mandatory_probes = manifest.grading.get('mandatory_probes', [])
+        probes_executed = [p.model_dump() for p in session_model.probe_history]
+        probe_recall = calculate_probe_recall(
+            mandatory_probes=mandatory_probes,
+            probes_executed=probes_executed,
+        )
+        
+        # Display metrics
+        print(f"\n📊 Step Efficiency: {step_efficiency['efficiency_score']:.2%}")
+        print(f"   Steps Used: {step_efficiency['steps_used']} (optimal: {step_efficiency['optimal_steps']})")
+        
+        print(f"\n🔍 {probe_recall}")
+        if probe_recall.mandatory_probes_missed:
+            print(f"   Missed probes: {', '.join(probe_recall.mandatory_probes_missed)}")
+        
+        # Calculate groundedness (LLM-as-judge)
+        print("\n⚖️  Evaluating groundedness...")
+        groundedness = calculate_groundedness(
+            diagnosis=diagnosis,
+            evidence_digest=session_model.evidence_digest,
+            probes_executed=probes_executed,
+        )
+        
+        print(f"\n⚖️  {groundedness}")
+        print(f"   {groundedness.justification}")
+        
+        # Combine metrics for saving
+        evaluation = {
+            "step_efficiency": step_efficiency,
+            "probe_recall": probe_recall.model_dump(),
+            "groundedness": groundedness.model_dump(),
+            "diagnosis_confidence": diagnosis["confidence"],
+        }
+        
+        print(f"\n{'=' * 70}")
+        print("DIAGNOSIS")
+        print("=" * 70)
+        print(f"\nRoot Cause:\n{diagnosis['root_cause']}")
+        print(f"\nRecommended Fixes:\n{diagnosis['recommended_fixes']}")
+        
+        print(f"\n{'=' * 70}")
+        print("EXPECTED ROOT CAUSE")
+        print("=" * 70)
+        print(f"\nID: {manifest.grading['expected_root_cause_id']}")
+        
+        # Save results
+        args.output_dir.mkdir(exist_ok=True)
+        
+        # Save session
+        session_file = save_session_to_file(
+            session_model,
+            str(args.output_dir)
+        )
+        print(f"\n💾 Session saved to: {session_file}")
+        
+        # Save report
+        report = generate_session_report(session_model)
+        report_file = args.output_dir / f"report_{session_model.session_id}.md"
+        report_file.write_text(report)
+        print(f"💾 Report saved to: {report_file}")
+        
+        # Save evaluation
+        eval_file = args.output_dir / f"evaluation_{session_model.session_id}.json"
+        eval_data = {
+            "scenario_id": manifest.scenario_id,
+            "scenario_title": manifest.title,
+            "session_id": session_model.session_id,
+            "evaluation": evaluation,
+            "diagnosis": diagnosis,
+            "expected_root_cause_id": manifest.grading['expected_root_cause_id'],
+            "mandatory_probes": mandatory_probes,
+            "timestamp": session_model.started_at.isoformat(),
+        }
+        eval_file.write_text(json.dumps(eval_data, indent=2, default=str))
+        print(f"💾 Evaluation saved to: {eval_file}")
+        
+        # Log to MLflow if tracking enabled
+        if mlflow_enabled:
+            print(f"\n{'=' * 70}")
+            print("LOGGING TO MLFLOW")
+            print("=" * 70)
+            
+            # Check that there is still an active MLflow run before logging
             active_run = None
+            try:
+                active_run = mlflow.active_run()
+            except Exception:
+                active_run = None
+            
+            if not active_run:
+                print("! MLflow run is not active; skipping MLflow logging.")
+            else:
+                # Log parameters
+                mlflow.log_param("scenario_id", manifest.scenario_id)
+                mlflow.log_param("scenario_title", manifest.title)
+                mlflow.log_param("category", manifest.category)
+                mlflow.log_param("difficulty", manifest.difficulty)
+                mlflow.log_param("max_steps", manifest.budgets['max_steps'])
+                mlflow.log_param("optimal_steps", manifest.budgets['optimal_steps'])
+                mlflow.log_param("llm_model", "gpt-5-mini")  # Could make this configurable
+                
+                # Log metrics
+                mlflow.log_metric("probe_recall", probe_recall.recall)
+                mlflow.log_metric("step_efficiency_score", step_efficiency['efficiency_score'])
+                mlflow.log_metric("step_efficiency_ratio", step_efficiency['efficiency_ratio'])
+                mlflow.log_metric("steps_used", step_efficiency['steps_used'])
+                mlflow.log_metric("groundedness_score", groundedness.score)
+                
+                # Log artifacts
+                mlflow.log_artifact(str(session_file))
+                mlflow.log_artifact(str(report_file))
+                mlflow.log_artifact(str(eval_file))
+                
+                # Set tags for easy filtering
+                mlflow.set_tag("category", manifest.category)
+                mlflow.set_tag("difficulty", manifest.difficulty)
+                mlflow.set_tag("expected_root_cause", manifest.grading['expected_root_cause_id'])
+                
+                print("✓ Logged to MLflow")
         
-        if not active_run:
-            print("! MLflow run is not active; skipping MLflow logging.")
-        else:
-            # Log parameters
-            mlflow.log_param("scenario_id", manifest.scenario_id)
-            mlflow.log_param("scenario_title", manifest.title)
-            mlflow.log_param("category", manifest.category)
-            mlflow.log_param("difficulty", manifest.difficulty)
-            mlflow.log_param("max_steps", manifest.budgets['max_steps'])
-            mlflow.log_param("optimal_steps", manifest.budgets['optimal_steps'])
-            mlflow.log_param("llm_model", "gpt-5-mini")  # Could make this configurable
+        # Tear down scenario
+        if compose_spec and not args.no_teardown:
+            print(f"\n{'=' * 70}")
+            print("TEARING DOWN SCENARIO")
+            print("=" * 70)
             
-            # Log metrics
-            mlflow.log_metric("probe_recall", probe_recall.recall)
-            mlflow.log_metric("step_efficiency_score", step_efficiency['efficiency_score'])
-            mlflow.log_metric("step_efficiency_ratio", step_efficiency['efficiency_ratio'])
-            mlflow.log_metric("steps_used", step_efficiency['steps_used'])
-            mlflow.log_metric("groundedness_score", groundedness.score)
-            
-            # Log artifacts
-            mlflow.log_artifact(str(session_file))
-            mlflow.log_artifact(str(report_file))
-            mlflow.log_artifact(str(eval_file))
-            
-            # Set tags for easy filtering
-            mlflow.set_tag("category", manifest.category)
-            mlflow.set_tag("difficulty", manifest.difficulty)
-            mlflow.set_tag("expected_root_cause", manifest.grading['expected_root_cause_id'])
-            
-            print("✓ Logged to MLflow")
-    
-    # Tear down scenario
-    if compose_spec and not args.no_teardown:
-        print(f"\n{'=' * 70}")
-        print("TEARING DOWN SCENARIO")
-        print("=" * 70)
-        
-        try:
-            tear_down_scenario(compose_spec)
-            print("✓ Scenario torn down")
-            
-            # If cleanup flag was used, also prune unused networks to prevent exhaustion
-            if args.cleanup:
-                print("\n🧹 Pruning unused Docker networks...")
-                try:
-                    result = subprocess.run(
-                        ["docker", "network", "prune", "-f"],
-                        capture_output=True,
-                        text=True,
-                        check=True
-                    )
-                    # Count how many networks were removed (network IDs only, exclude headers/footers)
-                    deleted_lines = [
-                        l
-                        for l in result.stdout.split('\n')
-                        if l.strip()
-                        and not l.startswith("Deleted Networks")
-                        and not l.startswith("Total reclaimed space")
-                    ]
-                    if deleted_lines:
-                        print(f"✓ Pruned {len(deleted_lines)} unused network(s)")
-                    else:
-                        print("✓ No unused networks to prune")
-                except Exception as e:
-                    print(f"⚠️  Warning: Failed to prune networks: {e}")
-                    
-        except Exception as e:
-            print(f"ERROR tearing down scenario: {e}")
+            try:
+                tear_down_scenario(compose_spec)
+                print("✓ Scenario torn down")
+                
+                # If cleanup flag was used, also prune unused networks to prevent exhaustion
+                if args.cleanup:
+                    print("\n🧹 Pruning unused Docker networks...")
+                    try:
+                        result = subprocess.run(
+                            ["docker", "network", "prune", "-f"],
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        # Count how many networks were removed (network IDs only, exclude headers/footers)
+                        deleted_lines = [
+                            l
+                            for l in result.stdout.split('\n')
+                            if l.strip()
+                            and not l.startswith("Deleted Networks")
+                            and not l.startswith("Total reclaimed space")
+                        ]
+                        if deleted_lines:
+                            print(f"✓ Pruned {len(deleted_lines)} unused network(s)")
+                        else:
+                            print("✓ No unused networks to prune")
+                    except Exception as e:
+                        print(f"⚠️  Warning: Failed to prune networks: {e}")
+                        
+            except Exception as e:
+                print(f"ERROR tearing down scenario: {e}")
     
     finally:
         # Ensure MLflow run is properly closed
