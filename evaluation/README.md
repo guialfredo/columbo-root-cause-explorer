@@ -68,8 +68,7 @@ When using `--track` flag, all evaluation data is logged to MLflow:
 **Tags for filtering:**
 - `category`: Problem category
 - `difficulty`: Scenario difficulty
-- `confidence`: Diagnosis confidence level
-- `probe_recall_status`: complete/incomplete
+- `expected_root_cause`: Expected root cause label
 
 ## Extending with New Metrics
 
