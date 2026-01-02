@@ -1,8 +1,18 @@
 """Volume-related probes for inspecting Docker volumes and their contents."""
 
 from columbo.schemas import ProbeResult
+from .spec import probe
 
 
+@probe(
+    name="list_volumes",
+    description="List all Docker volumes on the system. Useful for discovering named volumes that may contain stale state.",
+    scope="volume",
+    tags={"discovery", "list"},
+    args={},
+    required_args=set(),
+    example="{}"
+)
 def list_volumes_probe(probe_name: str = "list_volumes") -> ProbeResult:
     """List all Docker volumes on the local system.
     
@@ -44,6 +54,17 @@ def list_volumes_probe(probe_name: str = "list_volumes") -> ProbeResult:
         )
 
 
+@probe(
+    name="volume_metadata",
+    description="Retrieve volume metadata including creation time, labels, driver, and mountpoint. Critical for detecting stale volumes. Requires actual Docker volume name.",
+    scope="volume",
+    tags={"metadata", "state"},
+    args={
+        "volume_name": "Name of the volume to inspect (required)"
+    },
+    required_args={"volume_name"},
+    example='{"volume_name": "s003_data"}'
+)
 def volume_metadata_probe(volume_name: str, probe_name: str = "volume_metadata") -> ProbeResult:
     """Retrieve detailed metadata for a specific Docker volume.
     
@@ -98,6 +119,19 @@ def volume_metadata_probe(volume_name: str, probe_name: str = "volume_metadata")
         )
 
 
+@probe(
+    name="volume_data_inspection",
+    description="List files in a volume directory using a temporary read-only container. Shows file sizes and modification times. Requires actual Docker volume name.",
+    scope="volume",
+    tags={"inspection", "files"},
+    args={
+        "volume_name": "Name of the volume to inspect (required)",
+        "sample_path": "Path within the volume to list (default: /)",
+        "max_items": "Maximum number of items to list (default: 10)"
+    },
+    required_args={"volume_name"},
+    example='{"volume_name": "s003_data", "sample_path": "/", "max_items": 20}'
+)
 def volume_data_inspection_probe(
     volume_name: str,
     sample_path: str = "/",
@@ -197,6 +231,19 @@ def volume_data_inspection_probe(
                 pass  # Best effort cleanup
 
 
+@probe(
+    name="volume_file_read",
+    description="Read the contents of a specific file from a volume using a temporary read-only container. More constrained than container_exec for file reading. Requires actual Docker volume name.",
+    scope="volume",
+    tags={"files", "read"},
+    args={
+        "volume_name": "Name of the volume containing the file (required)",
+        "file_path": "Path to the file within the volume, e.g., /schema_version.txt (required)",
+        "max_bytes": "Maximum bytes to read from the file (default: 4000)"
+    },
+    required_args={"volume_name", "file_path"},
+    example='{"volume_name": "s003_data", "file_path": "/schema_version.txt"}'
+)
 def volume_file_read_probe(
     volume_name: str,
     file_path: str,
@@ -327,6 +374,18 @@ def volume_file_read_probe(
                 pass  # Best effort cleanup
 
 
+@probe(
+    name="inspect_volume_file_permissions",
+    description="Inspect file ownership (UID/GID) and permissions in a volume. Critical for diagnosing permission mismatches between volume initialization and container runtime user. Uses ls -ln to show numeric UIDs/GIDs. Volume is inspected at its root - use path_in_volume='/' for volume root, or '/subdir' for subdirectories. Requires actual Docker volume name.",
+    scope="volume",
+    tags={"permissions", "uid", "security"},
+    args={
+        "volume_name": "Name of the volume to inspect (required)",
+        "path_in_volume": "Path within the volume root to inspect. Use '/' for volume root, '/config' for config subdir, etc. (default: /)"
+    },
+    required_args={"volume_name"},
+    example='{"volume_name": "s005_permission_denied_s005_data", "path_in_volume": "/"}'
+)
 def inspect_volume_file_permissions(
     volume_name: str,
     path_in_volume: str = "/",

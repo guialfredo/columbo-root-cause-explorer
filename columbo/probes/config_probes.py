@@ -4,8 +4,21 @@ from pathlib import Path
 import yaml
 
 from columbo.schemas import ProbeResult
+from .spec import probe
 
 
+@probe(
+    name="config_files_detection",
+    description="Scan workspace for configuration files (docker-compose, .env, etc.)",
+    scope="config",
+    tags={"discovery", "config"},
+    args={
+        "root_path": "Root directory to scan (optional, defaults to workspace root)",
+        "max_depth": "Maximum directory depth to scan (default: 3)"
+    },
+    required_args=set(),
+    example='{"max_depth": 3}'
+)
 def detect_config_files_probe(
     root_path: str | Path,
     probe_name: str = "config_files_detection",
@@ -119,6 +132,22 @@ def detect_config_files_probe(
         )
 
 
+@probe(
+    name="env_files_parsing",
+    description="Parse .env files to extract environment variables. Auto-discovers config files if needed.",
+    scope="config",
+    tags={"parsing", "env"},
+    args={
+        "found_files": "Optional: list from config_files_detection. Will auto-discover if not provided."
+    },
+    required_args=set(),
+    example="{}",
+    requires="config_files_detection",
+    transform=lambda result: {
+        "found_files": [f for f in result.get("found_files", [])
+                       if f.get("type") == "environment_variables"]
+    }
+)
 def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing") -> ProbeResult:
     """Parse environment variable files (.env, environment.yml/yaml) to extract variables.
     
@@ -190,6 +219,22 @@ def env_files_parsing_probe(found_files, probe_name: str = "env_files_parsing") 
     )
 
 
+@probe(
+    name="docker_compose_parsing",
+    description="Parse docker-compose files to extract service definitions. Auto-discovers config files if needed. Note: Volume names are logical and may differ from actual Docker volume names.",
+    scope="config",
+    tags={"parsing", "docker-compose"},
+    args={
+        "found_files": "Optional: list from config_files_detection. Will auto-discover if not provided."
+    },
+    required_args=set(),
+    example="{}",
+    requires="config_files_detection",
+    transform=lambda result: {
+        "found_files": [f for f in result.get("found_files", [])
+                       if f.get("type") == "docker_compose"]
+    }
+)
 def docker_compose_parsing_probe(found_files, probe_name: str = "docker_compose_parsing") -> ProbeResult:
     """Parse docker-compose files to extract service definitions.
     
@@ -238,6 +283,22 @@ def docker_compose_parsing_probe(found_files, probe_name: str = "docker_compose_
     )
 
 
+@probe(
+    name="generic_config_parsing",
+    description="Parse generic YAML/JSON config files. Auto-discovers config files if needed.",
+    scope="config",
+    tags={"parsing", "yaml", "json"},
+    args={
+        "found_files": "Optional: list from config_files_detection. Will auto-discover if not provided."
+    },
+    required_args=set(),
+    example="{}",
+    requires="config_files_detection",
+    transform=lambda result: {
+        "found_files": [f for f in result.get("found_files", [])
+                       if f.get("type") == "generic_config"]
+    }
+)
 def generic_config_parsing_probe(found_files, probe_name: str = "generic_config_parsing") -> ProbeResult:
     """Parse generic configuration files (YAML/JSON) to extract settings.
     
