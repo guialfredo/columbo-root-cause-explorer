@@ -3,8 +3,18 @@
 from typing import List, Union
 from docker.models.containers import Container
 from columbo.schemas import ProbeResult
+from .spec import probe
 
 
+@probe(
+    name="containers_state",
+    description="Check status of all Docker containers (running, stopped, etc.)",
+    scope="container",
+    tags={"state", "health"},
+    args={},
+    required_args=set(),
+    example="{}"
+)
 def containers_state_probe(containers: List[Container], probe_name: str = "containers_state") -> ProbeResult:
     """Check the status of multiple containers.
     
@@ -42,6 +52,18 @@ def containers_state_probe(containers: List[Container], probe_name: str = "conta
     )
 
 
+@probe(
+    name="container_logs",
+    description="Retrieve logs from a specific container",
+    scope="container",
+    tags={"logs"},
+    args={
+        "container": "Name of the container (required)",
+        "tail": "Number of log lines to retrieve (default: 50)"
+    },
+    required_args={"container"},
+    example='{"container": "api_tests-rag_agent-1", "tail": 100}'
+)
 def container_logs_probe(container: Container, tail=50, probe_name: str = "container_logs") -> ProbeResult:
     """Retrieve recent logs from a container.
     
@@ -85,6 +107,19 @@ def container_logs_probe(container: Container, tail=50, probe_name: str = "conta
         )
 
 
+@probe(
+    name="container_exec",
+    description="Execute a command inside a running container and capture output.",
+    scope="container",
+    tags={"exec", "command"},
+    args={
+        "container": "Name of the container (required)",
+        "command": "Shell command to run (required). Should be read-only or diagnostic in nature.",
+        "tail_chars": "Max characters to keep from stdout/stderr (default: 4000)"
+    },
+    required_args={"container", "command"},
+    example='{"container": "container_name", "command": "ps aux"}'
+)
 def container_exec_probe(
     container: Container,
     command: str,
@@ -155,6 +190,17 @@ def container_exec_probe(
         )
 
 
+@probe(
+    name="container_mounts",
+    description="Show which volumes and bind mounts are attached to a container, including mount paths and read/write status. Returns actual Docker volume names in Source field, which may include project prefixes.",
+    scope="container",
+    tags={"mounts", "volumes"},
+    args={
+        "container": "Name of the container to inspect (required)"
+    },
+    required_args={"container"},
+    example='{"container": "s003_app"}'
+)
 def container_mounts_probe(container: Container, probe_name: str = "container_mounts") -> ProbeResult:
     """Inspect volume and bind mounts attached to a container.
     
@@ -215,6 +261,15 @@ def container_mounts_probe(container: Container, probe_name: str = "container_mo
         )
 
 
+@probe(
+    name="containers_ports",
+    description="Show port mappings for all containers. Critical for identifying port conflicts - reveals which containers are binding to host ports, including containers outside the current project.",
+    scope="container",
+    tags={"ports", "network"},
+    args={},
+    required_args=set(),
+    example="{}"
+)
 def containers_ports_probe(containers: List[Container], probe_name: str = "containers_ports") -> ProbeResult:
     """Inspect port mappings for all containers to identify which host ports are in use.
     
@@ -297,6 +352,17 @@ def containers_ports_probe(containers: List[Container], probe_name: str = "conta
     )
 
 
+@probe(
+    name="container_inspect",
+    description="Get detailed inspection data for a specific container including state, exit code, error messages, labels, and configuration.",
+    scope="container",
+    tags={"inspect", "state", "config"},
+    args={
+        "container": "Name of the container to inspect (required)"
+    },
+    required_args={"container"},
+    example='{"container": "data_processor_dev"}'
+)
 def container_inspect_probe(container: Container, probe_name: str = "container_inspect") -> ProbeResult:
     """Get detailed inspection data for a specific container.
     
@@ -358,6 +424,17 @@ def container_inspect_probe(container: Container, probe_name: str = "container_i
         )
 
 
+@probe(
+    name="inspect_container_runtime_uid",
+    description="Inspect the UID/GID that a running container is executing as. Critical for diagnosing permission mismatches where container user cannot access volume files owned by different user. Executes 'id' command in container.",
+    scope="container",
+    tags={"permissions", "uid", "security"},
+    args={
+        "container": "Name or ID of the running container to inspect (required)"
+    },
+    required_args={"container"},
+    example='{"container": "s005_worker"}'
+)
 def inspect_container_runtime_uid(
     container: Container,
     probe_name: str = "inspect_container_runtime_uid",

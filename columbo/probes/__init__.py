@@ -2,8 +2,12 @@
 
 This package provides a modular structure for container, volume, network,
 and configuration probes used in debugging containerized systems.
+
+The new unified probe specification (ProbeSpec) combines function references,
+metadata for selection, and IO contracts. Use PROBES dict for the new API.
 """
 
+from .spec import ProbeSpec, PROBES, probe
 from .container_probes import (
     containers_state_probe,
     container_logs_probe,
@@ -45,6 +49,10 @@ from .utils import (
 )
 
 __all__ = [
+    # New unified probe specification API
+    "ProbeSpec",
+    "PROBES",
+    "probe",
     # Container probes
     "containers_state_probe",
     "container_logs_probe",
@@ -68,7 +76,7 @@ __all__ = [
     "env_files_parsing_probe",
     "docker_compose_parsing_probe",
     "generic_config_parsing_probe",
-    # Registry
+    # Registry (backward compatible)
     "probe_registry",
     "PROBE_SCHEMAS",
     "PROBE_DEPENDENCIES",
