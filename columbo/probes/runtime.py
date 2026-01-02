@@ -1,0 +1,98 @@
+"""Runtime utilities for probe execution.
+
+This module provides centralized logic for resolving container references
+and invoking probes with proper type conversions. This keeps individual
+probes clean and focused on their diagnostic logic.
+"""
+
+from typing import Any, Callable, Dict, List, Optional
+from docker import DockerClient
+from docker.models.containers import Container
+from docker.errors import NotFound, APIError
+
+
+def resolve_container(
+    client: DockerClient,
+    containers: List[Container],
+    container_ref: str
+) -> Optional[Container]:
+    """Resolve a container name or ID to a Container object.
+    
+    This centralizes container lookup logic that was previously duplicated
+    across multiple probes. Handles both container names and IDs.
+    
+    Args:
+        client: Docker client instance
+        containers: List of available containers (from cache)
+        container_ref: Container name or ID to resolve
+        
+    Returns:
+        Container object if found, None otherwise
+    """
+    # First try direct lookup by name in cached containers
+    for container in containers:
+        container_id = container.id or ""
+        if container.name == container_ref or container_id.startswith(container_ref):
+            return container
+    
+    # Fallback: try client.containers.get() for short IDs or edge cases
+    try:
+        return client.containers.get(container_ref)
+    except (NotFound, APIError):
+        return None
+
+
+def invoke_probe(
+    probe_func: Callable[..., Any],
+    args: Dict[str, Any],
+    client: Optional[DockerClient] = None,
+    containers: Optional[List[Container]] = None
+) -> Dict[str, Any]:
+    """Invoke a probe with automatic container resolution.
+    
+    If the probe expects a Container object but receives a string name/ID,
+    this function resolves it automatically. This keeps probe implementations
+    clean while allowing the agent to work with strings.
+    
+    Args:
+        probe_func: The probe function to invoke
+        args: Dictionary of arguments to pass to the probe
+        client: Docker client for container resolution
+        containers: List of available containers for resolution
+        
+    Returns:
+        Probe result dictionary
+        
+    Raises:
+        ValueError: If container resolution is needed but client/containers not provided
+    """
+    # Make a copy to avoid mutating the original args
+    resolved_args = args.copy()
+    
+    # Check if we need to resolve a container reference
+    container_ref = resolved_args.get("container")
+    
+    if container_ref and isinstance(container_ref, str):
+        if not client or not containers:
+            raise ValueError(
+                "Container resolution requested but client or containers not provided"
+            )
+        
+        resolved_container = resolve_container(client, containers, container_ref)
+        if not resolved_container:
+            # Return error instead of raising exception (probes must not raise)
+            return {
+                "error": f"Container '{container_ref}' not found",
+                "available_containers": [c.name for c in containers],
+                "probe_name": args.get("probe_name", "unknown"),
+            }
+        
+        resolved_args["container"] = resolved_container
+    
+    # Invoke the probe with resolved arguments
+    result = probe_func(**resolved_args)
+    
+    # Convert ProbeResult to dict if needed
+    if hasattr(result, 'model_dump'):
+        return result.model_dump()
+    return result
