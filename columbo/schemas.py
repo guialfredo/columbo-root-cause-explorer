@@ -114,7 +114,10 @@ class ProbePlan(BaseModel):
             "If a value is not in evidence, use a different probe to discover it first."
         )
     )
-    expected_signal: str = Field(..., description="What would confirm/refute the top hypothesis.")
+    expected_signal: str = Field(
+        ..., 
+        description="CONCISE statement (~80 chars) of what this probe will reveal. Focus on key discriminator."
+    )
     stop_if: str = Field(..., description="Condition to stop probing and move to final diagnosis.")
 
 
