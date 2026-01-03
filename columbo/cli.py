@@ -29,9 +29,18 @@ from columbo.session_utils import (
 console = Console()
 
 
-def setup_dspy_llm(api_key: str, model: str):
-    """Configure DSPy with the specified LLM."""
-    lm = dspy.LM(model, api_key=api_key, cache=False)
+def setup_dspy_llm(api_key: str, model: str, seed: int = None):
+    """Configure DSPy with the specified LLM.
+    
+    Args:
+        api_key: LLM API key
+        model: Model name (e.g., 'openai/gpt-4')
+        seed: Optional random seed for reproducible outputs
+    """
+    kwargs = {"api_key": api_key, "cache": False, "temperature": 0.0}
+    if seed is not None:
+        kwargs["seed"] = seed
+    lm = dspy.LM(model, **kwargs)
     dspy.configure(lm=lm)
 
 
@@ -325,6 +334,14 @@ Examples:
     )
     
     debug_parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Random seed for reproducible LLM outputs (optional)"
+    )
+    
+    debug_parser.add_argument(
         "--output-dir",
         type=Path,
         default=None,
@@ -366,8 +383,10 @@ def run_debug(args: argparse.Namespace) -> int:
     
     # Configure LLM
     console.print("[dim]Configuring LLM...[/dim]")
+    if args.seed is not None:
+        console.print(f"[dim]Using seed: {args.seed} for reproducible outputs[/dim]")
     try:
-        setup_dspy_llm(api_key=openai_api_key, model=args.model)
+        setup_dspy_llm(api_key=openai_api_key, model=args.model, seed=args.seed)
     except Exception as e:
         console.print(f"[red]ERROR: Failed to configure LLM: {e}[/red]")
         return 1

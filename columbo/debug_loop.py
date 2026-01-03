@@ -189,7 +189,17 @@ def resolve_probe_dependencies(
     
     # Transform the dependency result and merge into args
     cached_result = probe_results_cache[required_probe]
-    transformed = dep_config["transform"](cached_result)
+    
+    # Convert ProbeResult to dict if needed for transform function compatibility
+    if hasattr(cached_result, 'to_dict'):
+        result_dict = cached_result.to_dict()
+    elif isinstance(cached_result, dict):
+        result_dict = cached_result
+    else:
+        # Fallback: try to convert to dict via model_dump if it's a Pydantic model
+        result_dict = cached_result.model_dump() if hasattr(cached_result, 'model_dump') else cached_result
+    
+    transformed = dep_config["transform"](result_dict)
     
     file_count = len(transformed.get("found_files", []))
     if context:
@@ -402,8 +412,18 @@ def _debug_loop_impl(
             
             evidence_input = EvidenceInput(evidence=evidence)
             hypotheses_result = hypothesis_gen(evidence_input=evidence_input)
-            hypotheses = hypotheses_result.hypotheses_output.hypotheses
+            structured_hypotheses = hypotheses_result.hypotheses_output.hypotheses  # List[Hypothesis]
             key_unknowns = hypotheses_result.hypotheses_output.key_unknowns
+            
+            # Update session with structured hypotheses
+            session.active_hypotheses = structured_hypotheses
+            
+            # Create string representation for LLM and logging
+            hypotheses_str = "\n".join([
+                f"{h.id}: {h.statement} | confidence: {h.confidence.value}" + 
+                (f" | why: {h.rationale}" if h.rationale else "")
+                for h in structured_hypotheses
+            ])
             
             # Trace hypothesis generation
             trace_reasoning_step(
@@ -411,48 +431,25 @@ def _debug_loop_impl(
                 step_num=step + 1,
                 inputs={"evidence": evidence[:500]},
                 outputs={
-                    "hypotheses": hypotheses[:500],
-                    "key_unknowns": key_unknowns[:300]
+                    "hypotheses": hypotheses_str[:500],
+                    "key_unknowns": key_unknowns[:300],
+                    "num_hypotheses": len(structured_hypotheses)
                 }
             )
             
-            context.vprint(f"\nHypotheses:\n{hypotheses}")
+            context.vprint(f"\nHypotheses:\n{hypotheses_str}")
             context.vprint(f"\nKey unknowns:\n{key_unknowns}")
             
-            # Parse and send hypotheses to UI
+            # Send structured hypotheses to UI
             if ui_callback:
-                # Parse the hypotheses string into structured data
-                hypothesis_list = []
-                for line in hypotheses.split('\n'):
-                    line = line.strip()
-                    if line and (line.startswith('H') or line.startswith('-')):
-                        # Try to extract hypothesis parts
-                        parts = line.split('|')
-                        desc = parts[0].strip()
-                        conf = "medium"
-                        reason = ""
-                        
-                        for part in parts[1:]:
-                            part_lower = part.lower()
-                            if 'confidence:' in part_lower:
-                                if ':' in part:
-                                    _, value = part.split(':', 1)
-                                    value = value.strip()
-                                    if value:
-                                        conf = value
-                            elif 'why:' in part_lower:
-                                if ':' in part:
-                                    _, value = part.split(':', 1)
-                                    value = value.strip()
-                                    if value:
-                                        reason = value
-                        
-                        hypothesis_list.append({
-                            "description": desc,
-                            "confidence": conf,
-                            "reasoning": reason
-                        })
-                
+                hypothesis_list = [
+                    {
+                        "description": f"{h.id}: {h.statement}",
+                        "confidence": h.confidence.value,
+                        "reasoning": h.rationale or ""
+                    }
+                    for h in structured_hypotheses
+                ]
                 ui_callback.update_hypotheses(hypothesis_list)
             
             # Plan next probe
@@ -463,7 +460,7 @@ def _debug_loop_impl(
             tools_spec = build_tools_spec()
             planning_input = ProbePlanningInput(
                 evidence=evidence,
-                hypotheses=hypotheses,
+                hypotheses=hypotheses_str,  # Use string representation for LLM
                 tools_spec=tools_spec
             )
             probe_plan_result = probe_planner(planning_input=planning_input)
@@ -478,7 +475,7 @@ def _debug_loop_impl(
                 step_type="probe_planning",
                 step_num=step + 1,
                 inputs={
-                    "hypotheses": hypotheses[:300],
+                    "hypotheses": hypotheses_str[:300],
                     "evidence": evidence[:300]
                 },
                 outputs={
@@ -587,7 +584,13 @@ def _debug_loop_impl(
                 prior_evidence_digest=prior_evidence_text
             )
             evidence_digest_result = evidence_digest(digest_input=digest_input)
-            new_finding = evidence_digest_result.digest_output.updated_evidence_digest
+            structured_finding = evidence_digest_result.digest_output.finding
+            
+            # Set the step number for the finding
+            structured_finding.step = step + 1
+            
+            # Add to session's findings log
+            session.findings_log.append(structured_finding)
             
             # Trace evidence digestion
             trace_reasoning_step(
@@ -597,29 +600,26 @@ def _debug_loop_impl(
                     "raw_probe_result": probe_result_str[:500],
                     "prior_evidence": prior_evidence_text[:300]
                 },
-                outputs={"new_finding": new_finding[:500]}
+                outputs={
+                    "finding_summary": structured_finding.summary[:300],
+                    "structured_data": str(structured_finding.structured)[:200]
+                }
             )
             
-            # Extract just the NEW information (not the full cumulative digest)
-            # by looking at what was added beyond the prior evidence
-            if prior_evidence_text and new_finding.startswith(prior_evidence_text):
-                # The digest returned the full cumulative text
-                new_info = new_finding[len(prior_evidence_text):].strip()
-            else:
-                # The digest returned incremental info or completely rewritten
-                new_info = new_finding
-            
-            # Add this finding to our evidence log with step marker
-            finding_entry = f"[Step {step + 1} - {probe_name}] {new_info}"
+            # Add finding summary to evidence log for LLM context
+            finding_entry = f"[Step {step + 1} - {probe_name}] {structured_finding.summary}"
             context.evidence_log.append(finding_entry)
             
-            context.vprint(f"\nNew finding:\n{new_info}")
+            context.vprint(f"\nNew finding:\n{structured_finding.summary}")
+            if structured_finding.structured:
+                context.vprint(f"Structured data: {structured_finding.structured}")
             
             # Update UI with latest finding
             if ui_callback:
                 ui_callback.update_finding({
-                    "summary": new_info,
-                    "significance": expected_signal if expected_signal else "N/A"
+                    "summary": structured_finding.summary,
+                    "significance": expected_signal if expected_signal else "N/A",
+                    "severity": structured_finding.severity.value
                 })
             
             # Reconstruct full evidence from initial problem + all findings
@@ -655,7 +655,7 @@ def _debug_loop_impl(
             
             stop_result = stop_decider(
                 evidence=evidence,
-                hypotheses=hypotheses,
+                hypotheses=hypotheses_str,  # Use string representation for LLM
                 steps_used=steps_used,
                 steps_remaining=steps_remaining
             )
@@ -670,7 +670,7 @@ def _debug_loop_impl(
                 step_num=step + 1,
                 inputs={
                     "evidence": evidence[:500],
-                    "hypotheses": hypotheses[:300],
+                    "hypotheses": hypotheses_str[:300],
                     "steps_used": steps_used,
                     "steps_remaining": steps_remaining
                 },

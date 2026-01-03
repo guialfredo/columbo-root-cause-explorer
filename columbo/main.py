@@ -12,10 +12,18 @@ from dotenv import load_dotenv
 import os
 
 
-def setup_dspy_llm(api_key: str):
-    """Configure DSPy with your LLM of choice."""
+def setup_dspy_llm(api_key: str, seed: int = None):
+    """Configure DSPy with your LLM of choice.
+    
+    Args:
+        api_key: OpenAI API key
+        seed: Optional random seed for reproducible outputs
+    """
     # For demo purposes, using OpenAI
-    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=False)
+    kwargs = {"api_key": api_key, "cache": False, "temperature": 0.0}
+    if seed is not None:
+        kwargs["seed"] = seed
+    lm = dspy.LM("openai/gpt-5-mini", **kwargs)
     dspy.configure(lm=lm)
 
 
@@ -26,7 +34,20 @@ if __name__ == "__main__":
     openai_api_key = os.getenv("OPENAI_API_KEY")
     if not openai_api_key:
         raise ValueError("OPENAI_API_KEY not set in environment.")
-    setup_dspy_llm(api_key=openai_api_key)
+    
+    # Optional: Set seed for reproducible runs
+    seed_value = os.getenv("COLUMBO_SEED")
+    if seed_value:
+        try:
+            seed = int(seed_value)
+        except ValueError as exc:
+            raise ValueError("COLUMBO_SEED must be an integer if set.") from exc
+    else:
+        seed = None
+    if seed:
+        print(f"Using seed: {seed} for reproducible outputs")
+    
+    setup_dspy_llm(api_key=openai_api_key, seed=seed)
 
     # Define the initial problem/evidence
     initial_evidence = """

@@ -83,7 +83,7 @@ class ColumboUI:
     def start(self):
         """Start the live UI display."""
         self.progress_task = self.progress.add_task(
-            "Investigation Progress", total=self.max_steps
+            "Investigation Budget Consumed", total=self.max_steps
         )
         self.live = Live(
             self.render(), 
@@ -112,7 +112,10 @@ class ColumboUI:
         # Investigation panel
         inv_content = []
         inv_content.append(f"[bold]Step {self.current_step}/{self.max_steps}[/bold]")
-        inv_content.append(f"[yellow]⚙ {self.current_activity}[/yellow]")
+        
+        # Only show activity if we're not done (don't duplicate stop decision)
+        if not self.stop_decision:
+            inv_content.append(f"[yellow]⚙ {self.current_activity}[/yellow]")
         
         # Show hypotheses first (more important than probe plan)
         if self.hypotheses:
@@ -131,12 +134,12 @@ class ColumboUI:
                 desc = desc.strip()
                 desc = re.sub(r'^H\d+:\s*', '', desc)
                 
-                # Aggressive truncate for compact display - aim for ~65 chars max
-                # First, try to find a natural break point early (dash, comma, em-dash)
-                truncate_at = 65
+                # Truncate for display - aim for ~110 chars max to show more context
+                # First, try to find a natural break point (dash, comma, em-dash)
+                truncate_at = 110
                 for delimiter in [' — ', ' - ', ', ', '; ']:
                     pos = desc.find(delimiter)
-                    if 20 < pos < truncate_at:
+                    if 30 < pos < truncate_at:
                         desc = desc[:pos]
                         break
                 else:
@@ -150,14 +153,15 @@ class ColumboUI:
                     "low": "🔵"
                 }.get(hyp.get("confidence", "").lower(), "⚪")
                 
+                # Single line display to avoid awkward wrapping
                 hyp_text = f"  [{conf_style}]{conf_badge} {desc}[/{conf_style}]"
                 inv_content.append(hyp_text)
             
             if len(self.hypotheses) > 3:
                 inv_content.append(f"  [dim]...and {len(self.hypotheses) - 3} more[/dim]")
         
-        # Show current probe plan after hypotheses
-        if self.current_probe_plan:
+        # Show current probe plan after hypotheses (but not if we've decided to stop)
+        if self.current_probe_plan and not self.stop_decision:
             inv_content.append("")
             inv_content.append(f"[bold magenta]📋 Next Probe:[/bold magenta]")
             
@@ -186,20 +190,28 @@ class ColumboUI:
                     exp = exp[:177] + "..."
                 inv_content.append(f"  [dim]Why: {exp}[/dim]")
         
-        # Show stop decision if available
+        # Show stop decision if available (at the end for better flow)
         if self.stop_decision:
             inv_content.append("")
+            inv_content.append("[bold]Decision:[/bold]")
             reasoning = self.stop_decision['reasoning']
-            # Extract first sentence for conciseness
-            if '. ' in reasoning:
-                reasoning = reasoning[:reasoning.find('. ') + 1]
-            elif len(reasoning) > 100:
-                reasoning = reasoning[:97] + "..."
+            
+            # Allow up to 200 chars for stop decision (it's important context)
+            # Try to break at sentence boundary if needed
+            if len(reasoning) > 200:
+                # Look for last complete sentence within 200 chars
+                truncate_pos = 200
+                last_period = reasoning.rfind('. ', 0, truncate_pos)
+                if last_period > 100:  # Use sentence break if it's not too early
+                    reasoning = reasoning[:last_period + 1]
+                else:
+                    # No good sentence break, just truncate with ellipsis
+                    reasoning = reasoning[:197] + "..."
             
             if self.stop_decision["should_stop"]:
-                inv_content.append(f"[bold red]🛑 Stopping:[/bold red] {reasoning}")
+                inv_content.append(f"  [bold red]🛑 Stop:[/bold red] {reasoning}")
             else:
-                inv_content.append(f"[bold green]▶ Continuing:[/bold green] {reasoning}")
+                inv_content.append(f"  [bold green]▶ Continue:[/bold green] {reasoning}")
         
         self.layout["investigation"].update(
             Panel(
@@ -212,24 +224,35 @@ class ColumboUI:
         # Evidence panel
         if self.latest_finding:
             summary = self.latest_finding['summary']
+            severity = self.latest_finding.get('severity', 'info')
             
-            # Display full finding - Rich will handle wrapping naturally
-            # Only truncate if extremely long (> 600 chars)
-            if len(summary) > 600:
-                # Find a good break point around 550 chars
-                truncate_pos = 550
-                # Try to break at sentence or phrase boundary
+            # Severity styling
+            severity_emoji = {
+                'critical': '🔴',
+                'warning': '🟡',
+                'info': 'ℹ️'
+            }.get(severity, 'ℹ️')
+            
+            severity_style = {
+                'critical': 'bold red',
+                'warning': 'bold yellow',
+                'info': 'bold green'
+            }.get(severity, 'bold green')
+            
+            # With concise summaries (~120 chars), less truncation needed
+            # Only truncate if unusually long (> 300 chars)
+            if len(summary) > 300:
+                truncate_pos = 280
                 for delimiter in ['. ', '\n', '; ', ', ']:
-                    pos = summary.rfind(delimiter, 400, truncate_pos)
+                    pos = summary.rfind(delimiter, 200, truncate_pos)
                     if pos > 0:
                         summary = summary[:pos + len(delimiter)] + "..."
                         break
                 else:
-                    # No good break, just truncate
-                    summary = summary[:550] + "..."
+                    summary = summary[:280] + "..."
             
             evidence_parts = [
-                Text("Key Finding:", style="bold green"),
+                Text(f"{severity_emoji} Latest Finding:", style=severity_style),
                 Text(""),
                 Text(summary)
             ]
@@ -285,7 +308,8 @@ class ColumboUI:
     def update_step(self, step: int):
         """Update current step number."""
         self.current_step = step
-        # Clear only probe plan from previous step (keep stop decision visible)
+        # Clear only probe plan from previous step
+        # Keep stop decision visible as context for why we're continuing
         self.current_probe_plan = None
         if self.progress_task is not None:
             self.progress.update(self.progress_task, completed=step)
@@ -301,6 +325,8 @@ class ColumboUI:
     def update_hypotheses(self, hypotheses: List[Dict[str, Any]]):
         """Update all active hypotheses."""
         self.hypotheses = hypotheses
+        # Clear previous stop decision now that we have new hypotheses (new round of thinking)
+        self.stop_decision = None
         if self.live:
             self.live.update(self.render())
     
