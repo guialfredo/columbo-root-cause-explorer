@@ -1,10 +1,21 @@
 """Container-related probes for inspecting Docker container states, logs, and execution."""
 
-from typing import List
+from typing import List, Union
 from docker.models.containers import Container
+from columbo.schemas import ProbeResult
+from .spec import probe
 
 
-def containers_state_probe(containers: List[Container], probe_name: str = "containers_state"):
+@probe(
+    name="containers_state",
+    description="Check status of all Docker containers (running, stopped, etc.)",
+    scope="container",
+    tags={"state", "health"},
+    args={},
+    required_args=set(),
+    example="{}"
+)
+def containers_state_probe(containers: List[Container], probe_name: str = "containers_state") -> ProbeResult:
     """Check the status of multiple containers.
     
     Args:
@@ -23,7 +34,6 @@ def containers_state_probe(containers: List[Container], probe_name: str = "conta
                     "container": container.name,
                     "status": status,
                     "healthy": status == "running",
-                    "probe_name": probe_name,
                 }
             )
         except Exception as e:
@@ -32,14 +42,29 @@ def containers_state_probe(containers: List[Container], probe_name: str = "conta
                     "container": getattr(container, "name", "unknown"),
                     "status": "unknown",
                     "healthy": False,
-                    "probe_name": probe_name,
                     "error": str(e),
                 }
             )
-    return evidence
+    return ProbeResult(
+        probe_name=probe_name,
+        success=True,
+        data={"containers": evidence}
+    )
 
 
-def container_logs_probe(container: Container, tail=50, probe_name: str = "container_logs"):
+@probe(
+    name="container_logs",
+    description="Retrieve logs from a specific container",
+    scope="container",
+    tags={"logs"},
+    args={
+        "container": "Container name or ID (required)",
+        "tail": "Number of log lines to retrieve (default: 50)"
+    },
+    required_args={"container"},
+    example='{"container": "api_tests-rag_agent-1", "tail": 100}'
+)
+def container_logs_probe(container: Container, tail=50, probe_name: str = "container_logs") -> ProbeResult:
     """Retrieve recent logs from a container.
     
     Args:
@@ -55,31 +80,52 @@ def container_logs_probe(container: Container, tail=50, probe_name: str = "conta
 
         if isinstance(logs, bytes):
             logs = logs.decode("utf-8", errors="replace")
+        elif not isinstance(logs, str):
+            logs = str(logs)
 
-        return {
-            "container": container.name,
-            "tail": tail,
-            "log_excerpt": logs,
-            "empty": len(logs.strip()) == 0,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "container": container.name,
+                "tail": tail,
+                "log_excerpt": logs,
+                "empty": len(logs.strip()) == 0,
+            }
+        )
 
     except Exception as e:
-        return {
-            "container": getattr(container, "name", "unknown"),
-            "tail": tail,
-            "log_excerpt": None,
-            "probe_name": probe_name,
-            "error": str(e),
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "container": getattr(container, "name", "unknown"),
+                "tail": tail,
+                "log_excerpt": None,
+            }
+        )
 
 
+@probe(
+    name="container_exec",
+    description="Execute a command inside a running container and capture output.",
+    scope="container",
+    tags={"exec", "command"},
+    args={
+        "container": "Container name or ID (required)",
+        "command": "Shell command to run (required). Should be read-only or diagnostic in nature.",
+        "tail_chars": "Max characters to keep from stdout/stderr (default: 4000)"
+    },
+    required_args={"container", "command"},
+    example='{"container": "container_name", "command": "ps aux"}'
+)
 def container_exec_probe(
     container: Container,
     command: str,
     tail_chars: int = 4000,
     probe_name: str = "container_exec",
-):
+) -> ProbeResult:
     """Execute a command inside a running container and capture output.
     
     Args:
@@ -115,31 +161,47 @@ def container_exec_probe(
         if len(stderr) > tail_chars:
             stderr = stderr[:tail_chars] + "\n...[truncated]"
 
-        return {
-            "container": container.name,
-            "command": command,
-            "exit_code": exec_log.exit_code,
-            "success": exec_log.exit_code == 0,
-            "stdout_excerpt": stdout,
-            "stderr_excerpt": stderr,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "container": container.name,
+                "command": command,
+                "exit_code": exec_log.exit_code,
+                "success": exec_log.exit_code == 0,
+                "stdout_excerpt": stdout,
+                "stderr_excerpt": stderr,
+            }
+        )
 
     except Exception as e:
-        return {
-            "container": getattr(container, "name", "unknown"),
-            "command": command,
-            "exit_code": None,
-            "success": False,
-            "stdout_excerpt": "",
-            "stderr_excerpt": "",
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "container": getattr(container, "name", "unknown"),
+                "command": command,
+                "exit_code": None,
+                "success": False,
+                "stdout_excerpt": "",
+                "stderr_excerpt": "",
+            }
+        )
 
 
-def container_mounts_probe(container: Container, probe_name: str = "container_mounts"):
+@probe(
+    name="container_mounts",
+    description="Show which volumes and bind mounts are attached to a container, including mount paths and read/write status. Returns actual Docker volume names in Source field, which may include project prefixes.",
+    scope="container",
+    tags={"mounts", "volumes"},
+    args={
+        "container": "Container name or ID to inspect (required)"
+    },
+    required_args={"container"},
+    example='{"container": "s003_app"}'
+)
+def container_mounts_probe(container: Container, probe_name: str = "container_mounts") -> ProbeResult:
     """Inspect volume and bind mounts attached to a container.
     
     Essential for understanding which volumes a container is using and where they're mounted.
@@ -177,24 +239,38 @@ def container_mounts_probe(container: Container, probe_name: str = "container_mo
                 }
             )
 
-        return {
-            "container": container.name,
-            "mounts": mount_info,
-            "mount_count": len(mount_info),
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "container": container.name,
+                "mounts": mount_info,
+                "mount_count": len(mount_info),
+            }
+        )
     except Exception as e:
-        return {
-            "container": getattr(container, "name", "unknown"),
-            "mounts": [],
-            "mount_count": 0,
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "container": getattr(container, "name", "unknown"),
+                "mounts": [],
+                "mount_count": 0,
+            }
+        )
 
 
-def containers_ports_probe(containers: List[Container], probe_name: str = "containers_ports"):
+@probe(
+    name="containers_ports",
+    description="Show port mappings for all containers. Critical for identifying port conflicts - reveals which containers are binding to host ports, including containers outside the current project.",
+    scope="container",
+    tags={"ports", "network"},
+    args={},
+    required_args=set(),
+    example="{}"
+)
+def containers_ports_probe(containers: List[Container], probe_name: str = "containers_ports") -> ProbeResult:
     """Inspect port mappings for all containers to identify which host ports are in use.
     
     Critical for diagnosing port conflicts. Shows which containers are binding to host ports
@@ -260,7 +336,6 @@ def containers_ports_probe(containers: List[Container], probe_name: str = "conta
                 "status": container.status,
                 "port_mappings": port_mappings,
                 "has_host_ports": any(p.get("host_port") is not None for p in port_mappings),
-                "probe_name": probe_name,
             })
         except Exception as e:
             evidence.append({
@@ -268,14 +343,27 @@ def containers_ports_probe(containers: List[Container], probe_name: str = "conta
                 "status": "unknown",
                 "port_mappings": [],
                 "has_host_ports": False,
-                "probe_name": probe_name,
                 "error": str(e),
-                "error_type": type(e).__name__,
             })
-    return evidence
+    return ProbeResult(
+        probe_name=probe_name,
+        success=True,
+        data={"containers": evidence}
+    )
 
 
-def container_inspect_probe(container: Container, probe_name: str = "container_inspect"):
+@probe(
+    name="container_inspect",
+    description="Get detailed inspection data for a specific container including state, exit code, error messages, labels, and configuration.",
+    scope="container",
+    tags={"inspect", "state", "config"},
+    args={
+        "container": "Container name or ID to inspect (required)"
+    },
+    required_args={"container"},
+    example='{"container": "data_processor_dev"}'
+)
+def container_inspect_probe(container: Container, probe_name: str = "container_inspect") -> ProbeResult:
     """Get detailed inspection data for a specific container.
     
     Provides comprehensive container information including state, configuration,
@@ -305,34 +393,52 @@ def container_inspect_probe(container: Container, probe_name: str = "container_i
         config = attrs.get("Config", {})
         network_settings = attrs.get("NetworkSettings", {})
         
-        return {
-            "container": container.name,
-            "id": container.id[:12],
-            "image": config.get("Image"),
-            "status": state.get("Status"),
-            "running": state.get("Running", False),
-            "exit_code": state.get("ExitCode"),
-            "error": state.get("Error"),
-            "started_at": state.get("StartedAt"),
-            "finished_at": state.get("FinishedAt"),
-            "labels": config.get("Labels", {}),
-            "ports": network_settings.get("Ports", {}),
-            "networks": list(network_settings.get("Networks", {}).keys()),
-            "probe_name": probe_name,
-        }
+        container_id = container.id[:12] if container.id else "unknown"
+        
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "container": container.name,
+                "id": container_id,
+                "image": config.get("Image"),
+                "status": state.get("Status"),
+                "running": state.get("Running", False),
+                "exit_code": state.get("ExitCode"),
+                "error": state.get("Error"),
+                "started_at": state.get("StartedAt"),
+                "finished_at": state.get("FinishedAt"),
+                "labels": config.get("Labels", {}),
+                "ports": network_settings.get("Ports", {}),
+                "networks": list(network_settings.get("Networks", {}).keys()),
+            }
+        )
     except Exception as e:
-        return {
-            "container": getattr(container, "name", "unknown"),
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "container": getattr(container, "name", "unknown"),
+            }
+        )
 
 
+@probe(
+    name="inspect_container_runtime_uid",
+    description="Inspect the UID/GID that a running container is executing as. Critical for diagnosing permission mismatches where container user cannot access volume files owned by different user. Executes 'id' command in container.",
+    scope="container",
+    tags={"permissions", "uid", "security"},
+    args={
+        "container": "Container name or ID of the running container to inspect (required)"
+    },
+    required_args={"container"},
+    example='{"container": "s005_worker"}'
+)
 def inspect_container_runtime_uid(
     container: Container,
     probe_name: str = "inspect_container_runtime_uid",
-):
+) -> ProbeResult:
     """Inspect the runtime UID/GID that a container is executing as.
     
     Executes the `id` command inside a running container to determine:
@@ -359,33 +465,37 @@ def inspect_container_runtime_uid(
     try:
         # Check if container is running
         if container.status != "running":
-            return {
-                "container": container.name,
-                "container_status": container.status,
-                "uid": None,
-                "gid": None,
-                "username": None,
-                "groups": None,
-                "raw_output": None,
-                "probe_name": probe_name,
-                "error": f"Container is not running (status: {container.status})",
-                "error_type": "container_not_running",
-            }
+            return ProbeResult(
+                probe_name=probe_name,
+                success=False,
+                error=f"Container is not running (status: {container.status})",
+                data={
+                    "container": container.name,
+                    "container_status": container.status,
+                    "uid": None,
+                    "gid": None,
+                    "username": None,
+                    "groups": None,
+                    "raw_output": None,
+                }
+            )
         
         # Execute `id` command to get user info
         exec_log = container.exec_run(["id"])
         if exec_log.exit_code != 0:
-            return {
-                "container": container.name,
-                "uid": None,
-                "gid": None,
-                "username": None,
-                "groups": None,
-                "raw_output": None,
-                "probe_name": probe_name,
-                "error": f"id command failed with exit code {exec_log.exit_code}",
-                "error_type": "command_execution_error",
-            }
+            return ProbeResult(
+                probe_name=probe_name,
+                success=False,
+                error=f"id command failed with exit code {exec_log.exit_code}",
+                data={
+                    "container": container.name,
+                    "uid": None,
+                    "gid": None,
+                    "username": None,
+                    "groups": None,
+                    "raw_output": None,
+                }
+            )
         
         raw_output = exec_log.output.decode("utf-8", errors="replace").strip()
         
@@ -412,24 +522,29 @@ def inspect_container_runtime_uid(
         except Exception:
             pass  # Parsing failed, return raw output anyway
         
-        return {
-            "container": container.name,
-            "uid": uid,
-            "gid": gid,
-            "username": username,
-            "groups": groups,
-            "raw_output": raw_output,
-            "probe_name": probe_name,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "container": container.name,
+                "uid": uid,
+                "gid": gid,
+                "username": username,
+                "groups": groups,
+                "raw_output": raw_output,
+            }
+        )
     except Exception as e:
-        return {
-            "container": getattr(container, "name", "unknown"),
-            "uid": None,
-            "gid": None,
-            "username": None,
-            "groups": None,
-            "raw_output": None,
-            "probe_name": probe_name,
-            "error": str(e),
-            "error_type": type(e).__name__,
-        }
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "container": getattr(container, "name", "unknown"),
+                "uid": None,
+                "gid": None,
+                "username": None,
+                "groups": None,
+                "raw_output": None,
+            }
+        )
