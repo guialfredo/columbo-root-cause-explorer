@@ -262,7 +262,7 @@ class Finding(BaseModel):
     """A small, human-readable piece of evidence extracted from raw probe output."""
     model_config = ConfigDict(extra="forbid")
 
-    step: int = Field(..., ge=1)
+    step: int = Field(default=0, ge=0, description="Step number assigned by orchestration layer, not LLM.")
     severity: Severity = Severity.info
     summary: str = Field(
         ..., 

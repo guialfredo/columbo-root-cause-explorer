@@ -36,8 +36,14 @@ if __name__ == "__main__":
         raise ValueError("OPENAI_API_KEY not set in environment.")
     
     # Optional: Set seed for reproducible runs
-    seed = os.getenv("COLUMBO_SEED")
-    seed = int(seed) if seed else None
+    seed_value = os.getenv("COLUMBO_SEED")
+    if seed_value:
+        try:
+            seed = int(seed_value)
+        except ValueError as exc:
+            raise ValueError("COLUMBO_SEED must be an integer if set.") from exc
+    else:
+        seed = None
     if seed:
         print(f"Using seed: {seed} for reproducible outputs")
     
