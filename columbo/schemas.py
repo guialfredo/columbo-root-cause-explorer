@@ -278,7 +278,11 @@ class Hypothesis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., description="Stable identifier like H1, H2...")
-    statement: str = Field(..., min_length=1)
+    statement: str = Field(
+        ..., 
+        min_length=1,
+        description="Concise, single-sentence hypothesis about the root cause (~80 chars max). Put details in rationale."
+    )
     confidence: ConfidenceLevel = ConfidenceLevel.low
     rationale: Optional[str] = Field(
         default=None,

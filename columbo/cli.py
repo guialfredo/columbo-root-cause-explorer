@@ -37,7 +37,7 @@ def setup_dspy_llm(api_key: str, model: str, seed: int = None):
         model: Model name (e.g., 'openai/gpt-4')
         seed: Optional random seed for reproducible outputs
     """
-    kwargs = {"api_key": api_key, "cache": False}
+    kwargs = {"api_key": api_key, "cache": False, "temperature": 0.0}
     if seed is not None:
         kwargs["seed"] = seed
     lm = dspy.LM(model, **kwargs)

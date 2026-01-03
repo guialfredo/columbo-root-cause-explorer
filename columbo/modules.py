@@ -22,9 +22,13 @@ class HypothesesFromEvidence(dspy.Signature):
     
     Output structured Hypothesis objects with:
     - id: H1, H2, H3, etc. (sequential)
-    - statement: Clear, testable hypothesis about the root cause
+    - statement: CONCISE one-sentence hypothesis (~10-15 words max). Focus on the core issue.
     - confidence: low/medium/high based on available evidence
-    - rationale: Brief explanation of why this hypothesis is plausible
+    - rationale: Brief explanation with supporting details (this can be longer)
+    
+    CRITICAL: Keep statements short and punchy for UI display. Put elaboration in rationale.
+    Example good statement: "Vectordb service not reachable from rag-agent container"
+    Example bad statement: "The rag-agent cannot reach the vectordb because the two containers are on different networks and there is no shared network configured in docker-compose"
     """
     evidence_input: EvidenceInput = dspy.InputField()
     hypotheses_output: HypothesesOutput = dspy.OutputField()
