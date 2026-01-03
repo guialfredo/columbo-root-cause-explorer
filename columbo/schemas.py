@@ -267,7 +267,11 @@ class Finding(BaseModel):
     summary: str = Field(
         ..., 
         min_length=1,
-        description="CONCISE 1-2 sentence summary of what was discovered (~120 chars max). Focus on key facts."
+        description="CONCISE 1-2 sentence summary for UI display (~120 chars max). Focus on key facts."
+    )
+    detailed_summary: Optional[str] = Field(
+        default=None,
+        description="Longer, detailed analysis for agent reasoning (no length limit). Include all relevant facts, values, and context that might be needed for diagnosis."
     )
 
     # Structured anchors to support "proof".

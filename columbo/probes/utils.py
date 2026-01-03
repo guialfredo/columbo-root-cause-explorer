@@ -12,14 +12,23 @@ ARG_ALIASES = {
 }
 
 
-def build_tools_spec():
+def build_tools_spec(excluded_probes: set = None):
     """Build comprehensive tools specification from PROBE_SCHEMAS.
     
-    Returns formatted markdown string with all probe details for LLM consumption.
+    Args:
+        excluded_probes: Set of probe names to exclude from the spec (for scenario-specific restrictions)
+    
+    Returns:
+        Formatted markdown string with all probe details for LLM consumption.
     """
+    if excluded_probes is None:
+        excluded_probes = set()
+    
     lines = ["# Available Diagnostic Probes\n"]
     
     for name in probe_registry.keys():
+        if name in excluded_probes:
+            continue
         schema = PROBE_SCHEMAS.get(name, {})
         desc = schema.get("description", "")
         args = schema.get("args", {})

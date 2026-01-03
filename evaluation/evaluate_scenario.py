@@ -192,6 +192,11 @@ def main():
         ui = ColumboUI(max_steps=manifest.budgets['max_steps'], verbose=False)
         ui.start()
     
+    # Extract excluded probes from manifest if specified
+    excluded_probes = set(manifest.grading.get('excluded_probes', []))
+    if excluded_probes:
+        print(f"⚠️  Excluded probes for this scenario: {', '.join(excluded_probes)}\n")
+    
     # Start MLflow run before debug_loop if tracking is enabled
     # This allows traces/spans to be captured during debugging
     mlflow_run_context = None
@@ -207,6 +212,7 @@ def main():
                 workspace_root=str(scenario_ref.scenario_dir),
                 ui_callback=ui,
                 verbose=not args.interactive,  # Suppress logs in interactive mode
+                excluded_probes=excluded_probes if excluded_probes else None
             )
             
             diagnosis = result["diagnosis"]
