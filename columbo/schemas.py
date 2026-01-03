@@ -90,9 +90,9 @@ class HypothesesOutput(BaseModel):
     """Structured output for hypothesis generation."""
     model_config = ConfigDict(extra="forbid")
 
-    hypotheses: str = Field(
+    hypotheses: List[Hypothesis] = Field(
         ..., 
-        description="3-5 hypotheses, ranked. Each: 'H#: ... | confidence: low/med/high | why'."
+        description="3-5 ranked hypotheses about the root cause. Each must have id, statement, confidence, and optionally rationale."
     )
     key_unknowns: str = Field(
         ...,
