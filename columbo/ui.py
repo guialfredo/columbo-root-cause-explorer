@@ -83,7 +83,7 @@ class ColumboUI:
     def start(self):
         """Start the live UI display."""
         self.progress_task = self.progress.add_task(
-            "Investigation Progress", total=self.max_steps
+            "Investigation Budget Consumed", total=self.max_steps
         )
         self.live = Live(
             self.render(), 
@@ -112,7 +112,10 @@ class ColumboUI:
         # Investigation panel
         inv_content = []
         inv_content.append(f"[bold]Step {self.current_step}/{self.max_steps}[/bold]")
-        inv_content.append(f"[yellow]⚙ {self.current_activity}[/yellow]")
+        
+        # Only show activity if we're not done (don't duplicate stop decision)
+        if not self.stop_decision:
+            inv_content.append(f"[yellow]⚙ {self.current_activity}[/yellow]")
         
         # Show hypotheses first (more important than probe plan)
         if self.hypotheses:
@@ -150,6 +153,7 @@ class ColumboUI:
                     "low": "🔵"
                 }.get(hyp.get("confidence", "").lower(), "⚪")
                 
+                # Single line display to avoid awkward wrapping
                 hyp_text = f"  [{conf_style}]{conf_badge} {desc}[/{conf_style}]"
                 inv_content.append(hyp_text)
             
@@ -186,20 +190,21 @@ class ColumboUI:
                     exp = exp[:177] + "..."
                 inv_content.append(f"  [dim]Why: {exp}[/dim]")
         
-        # Show stop decision if available
+        # Show stop decision if available (at the end for better flow)
         if self.stop_decision:
             inv_content.append("")
+            inv_content.append("[bold]Decision:[/bold]")
             reasoning = self.stop_decision['reasoning']
-            # Extract first sentence for conciseness
+            # Keep first sentence only for conciseness
             if '. ' in reasoning:
                 reasoning = reasoning[:reasoning.find('. ') + 1]
-            elif len(reasoning) > 100:
-                reasoning = reasoning[:97] + "..."
+            elif len(reasoning) > 120:
+                reasoning = reasoning[:117] + "..."
             
             if self.stop_decision["should_stop"]:
-                inv_content.append(f"[bold red]🛑 Stopping:[/bold red] {reasoning}")
+                inv_content.append(f"  [bold red]🛑 Stop:[/bold red] {reasoning}")
             else:
-                inv_content.append(f"[bold green]▶ Continuing:[/bold green] {reasoning}")
+                inv_content.append(f"  [bold green]▶ Continue:[/bold green] {reasoning}")
         
         self.layout["investigation"].update(
             Panel(
@@ -212,24 +217,35 @@ class ColumboUI:
         # Evidence panel
         if self.latest_finding:
             summary = self.latest_finding['summary']
+            severity = self.latest_finding.get('severity', 'info')
             
-            # Display full finding - Rich will handle wrapping naturally
-            # Only truncate if extremely long (> 600 chars)
-            if len(summary) > 600:
-                # Find a good break point around 550 chars
-                truncate_pos = 550
-                # Try to break at sentence or phrase boundary
+            # Severity styling
+            severity_emoji = {
+                'critical': '🔴',
+                'warning': '🟡',
+                'info': 'ℹ️'
+            }.get(severity, 'ℹ️')
+            
+            severity_style = {
+                'critical': 'bold red',
+                'warning': 'bold yellow',
+                'info': 'bold green'
+            }.get(severity, 'bold green')
+            
+            # With concise summaries (~120 chars), less truncation needed
+            # Only truncate if unusually long (> 300 chars)
+            if len(summary) > 300:
+                truncate_pos = 280
                 for delimiter in ['. ', '\n', '; ', ', ']:
-                    pos = summary.rfind(delimiter, 400, truncate_pos)
+                    pos = summary.rfind(delimiter, 200, truncate_pos)
                     if pos > 0:
                         summary = summary[:pos + len(delimiter)] + "..."
                         break
                 else:
-                    # No good break, just truncate
-                    summary = summary[:550] + "..."
+                    summary = summary[:280] + "..."
             
             evidence_parts = [
-                Text("Key Finding:", style="bold green"),
+                Text(f"{severity_emoji} Latest Finding:", style=severity_style),
                 Text(""),
                 Text(summary)
             ]

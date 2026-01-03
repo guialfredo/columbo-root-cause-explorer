@@ -29,6 +29,14 @@ class HypothesesFromEvidence(dspy.Signature):
     CRITICAL: Keep statements short and punchy for UI display. Put elaboration in rationale.
     Example good statement: "Vectordb service not reachable from rag-agent container"
     Example bad statement: "The rag-agent cannot reach the vectordb because the two containers are on different networks and there is no shared network configured in docker-compose"
+    
+    CONFIDENCE RANKING: 
+    - Rank hypotheses by likelihood/evidence strength
+    - Use DIFFERENT confidence levels to show your ranking (high > medium > low)
+    - H1 should typically have higher confidence than H4
+    - high: Strong direct evidence supports this hypothesis
+    - medium: Some evidence points this way but not conclusive
+    - low: Plausible but speculative without strong evidence
     """
     evidence_input: EvidenceInput = dspy.InputField()
     hypotheses_output: HypothesesOutput = dspy.OutputField()
@@ -59,7 +67,17 @@ probe_planner = dspy.Predict(NextProbePlan)
 
 
 class EvidenceDigest(dspy.Signature):
-    """Extract salient facts from probe results."""
+    """Extract salient facts from probe results into a structured Finding.
+    
+    Create a Finding with:
+    - summary: CONCISE 1-2 sentence summary (~120 chars). Focus on actionable facts.
+    - structured: Key-value pairs of important data (container names, ports, statuses, config values, etc.)
+    - severity: info (default), warning (potential issue), critical (confirmed problem)
+    
+    CRITICAL: Keep summary short and clear for UI display. Put details in structured dict.
+    Example good summary: "Both containers running and healthy. Qdrant exposed on 6333, rag-agent depends on it."
+    Example bad summary: "[Step 2 - docker_compose_parsing] docker-compose parsed (1 file). Services=2. qdrant: container_name=s001_qdrant, image=qdrant/qdrant:latest, host ports mapped 6333->6333 and 6334->6334..."
+    """
     digest_input: EvidenceDigestInput = dspy.InputField()
     digest_output: DigestOutput = dspy.OutputField()
 

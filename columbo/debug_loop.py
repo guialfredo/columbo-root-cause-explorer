@@ -584,7 +584,13 @@ def _debug_loop_impl(
                 prior_evidence_digest=prior_evidence_text
             )
             evidence_digest_result = evidence_digest(digest_input=digest_input)
-            new_finding = evidence_digest_result.digest_output.updated_evidence_digest
+            structured_finding = evidence_digest_result.digest_output.finding
+            
+            # Set the step number for the finding
+            structured_finding.step = step + 1
+            
+            # Add to session's findings log
+            session.findings_log.append(structured_finding)
             
             # Trace evidence digestion
             trace_reasoning_step(
@@ -594,29 +600,26 @@ def _debug_loop_impl(
                     "raw_probe_result": probe_result_str[:500],
                     "prior_evidence": prior_evidence_text[:300]
                 },
-                outputs={"new_finding": new_finding[:500]}
+                outputs={
+                    "finding_summary": structured_finding.summary[:300],
+                    "structured_data": str(structured_finding.structured)[:200]
+                }
             )
             
-            # Extract just the NEW information (not the full cumulative digest)
-            # by looking at what was added beyond the prior evidence
-            if prior_evidence_text and new_finding.startswith(prior_evidence_text):
-                # The digest returned the full cumulative text
-                new_info = new_finding[len(prior_evidence_text):].strip()
-            else:
-                # The digest returned incremental info or completely rewritten
-                new_info = new_finding
-            
-            # Add this finding to our evidence log with step marker
-            finding_entry = f"[Step {step + 1} - {probe_name}] {new_info}"
+            # Add finding summary to evidence log for LLM context
+            finding_entry = f"[Step {step + 1} - {probe_name}] {structured_finding.summary}"
             context.evidence_log.append(finding_entry)
             
-            context.vprint(f"\nNew finding:\n{new_info}")
+            context.vprint(f"\nNew finding:\n{structured_finding.summary}")
+            if structured_finding.structured:
+                context.vprint(f"Structured data: {structured_finding.structured}")
             
             # Update UI with latest finding
             if ui_callback:
                 ui_callback.update_finding({
-                    "summary": new_info,
-                    "significance": expected_signal if expected_signal else "N/A"
+                    "summary": structured_finding.summary,
+                    "significance": expected_signal if expected_signal else "N/A",
+                    "severity": structured_finding.severity.value
                 })
             
             # Reconstruct full evidence from initial problem + all findings
