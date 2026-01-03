@@ -58,6 +58,12 @@ class NextProbePlan(dspy.Signature):
     - If the evidence mentions specific containers, use that exact name
     - If multiple containers exist, choose the most relevant one based on the error/hypothesis
     - If a required value is not in the evidence, choose a probe that will discover it first
+    
+    EXPECTED SIGNAL:
+    - Keep it CONCISE (~80 chars max) for UI display
+    - Focus on the KEY discriminator this probe reveals
+    - Example good: "Will show if qdrant container is running and what networks it's on"
+    - Example bad: "The containers_state output will list all Docker containers and their statuses. Confirmation of H1: there is no container corresponding to the vectordb service, or there is a vectordb container but it is not running or has crashed. Refutation of H1..."
     """
     planning_input: ProbePlanningInput = dspy.InputField()
     probe_plan: ProbePlan = dspy.OutputField()
