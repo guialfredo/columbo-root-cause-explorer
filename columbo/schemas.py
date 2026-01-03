@@ -122,9 +122,9 @@ class DigestOutput(BaseModel):
     """Structured output for evidence digestion."""
     model_config = ConfigDict(extra="forbid")
 
-    updated_evidence_digest: str = Field(
+    finding: Finding = Field(
         ...,
-        description="Updated digest: only salient facts, include concrete values (host/port/status)."
+        description="Extracted finding from probe result. Summary should be concise (1-2 sentences), structured contains key-value facts."
     )
 
 
@@ -261,16 +261,20 @@ class Finding(BaseModel):
 
     step: int = Field(..., ge=1)
     severity: Severity = Severity.info
-    summary: str = Field(..., min_length=1)
+    summary: str = Field(
+        ..., 
+        min_length=1,
+        description="CONCISE 1-2 sentence summary of what was discovered (~120 chars max). Focus on key facts."
+    )
 
-    # Structured anchors to support “proof”.
+    # Structured anchors to support "proof".
     references: List[str] = Field(
         default_factory=list,
         description="Pointers like 'probe:container_logs step:3' or 'file:docker-compose.yml'."
     )
     structured: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Optional structured facts (e.g., {'HOST': 'api', 'container': 'client'})."
+        description="Key-value facts extracted (e.g., {'container': 'api', 'status': 'running', 'port': 5000})."
     )
 
 
