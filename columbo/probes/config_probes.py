@@ -285,7 +285,7 @@ def docker_compose_parsing_probe(found_files, probe_name: str = "docker_compose_
 
 @probe(
     name="generic_config_parsing",
-    description="Parse generic YAML/JSON config files. Auto-discovers config files if needed.",
+    description="Parse generic YAML/JSON config files including environment configs. Auto-discovers config files if needed.",
     scope="config",
     tags={"parsing", "yaml", "json"},
     args={
@@ -296,7 +296,7 @@ def docker_compose_parsing_probe(found_files, probe_name: str = "docker_compose_
     requires="config_files_detection",
     transform=lambda result: {
         "found_files": [f for f in result.get("found_files", [])
-                       if f.get("type") == "generic_config"]
+                       if f.get("type") in ("generic_config", "environment_variables")]
     }
 )
 def generic_config_parsing_probe(found_files, probe_name: str = "generic_config_parsing") -> ProbeResult:

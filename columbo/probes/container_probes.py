@@ -548,3 +548,80 @@ def inspect_container_runtime_uid(
                 "raw_output": None,
             }
         )
+
+
+@probe(
+    name="inspect_container_environment",
+    description="Inspect environment variables configured on a container. Shows all env vars Docker set on the container from compose, env_file, or runtime config. Critical for diagnosing configuration overrides and environment conflicts.",
+    scope="container",
+    tags={"environment", "config"},
+    args={
+        "container": "Container name or ID to inspect (required)"
+    },
+    required_args={"container"},
+    example='{"container": "rag_agent"}'
+)
+def inspect_container_environment_probe(
+    container: Container,
+    probe_name: str = "inspect_container_environment",
+) -> ProbeResult:
+    """Inspect environment variables configured on a container.
+    
+    Returns all environment variables that Docker set on the container, including:
+    - Variables from docker-compose.yml environment section
+    - Variables from env_file in compose
+    - Variables from runtime configuration
+    - Default variables from the image
+    
+    Critical for diagnosing:
+    - Environment variable overrides between sources
+    - Configuration conflicts (e.g., compose vars vs. config file)
+    - Unexpected values causing connection failures
+    - Verifying what config the application actually received
+    
+    Use this when investigating:
+    - Services connecting to wrong hosts/ports
+    - Configuration not matching expectations
+    - Environment-dependent behavior differences
+    - Suspected override or precedence issues
+    
+    Args:
+        container: Docker container object to inspect
+        probe_name: Identifier for this probe execution
+        
+    Returns:
+        dict: Contains environment as key-value dict. Returns empty dict on error.
+    """
+    try:
+        attrs = container.attrs
+        config = attrs.get("Config", {})
+        
+        # Parse environment variables from Config.Env (list of "KEY=VALUE" strings)
+        env_list = config.get("Env", [])
+        env_dict = {}
+        
+        for env_entry in env_list:
+            if "=" in env_entry:
+                key, value = env_entry.split("=", 1)
+                env_dict[key] = value
+        
+        return ProbeResult(
+            probe_name=probe_name,
+            success=True,
+            data={
+                "container": container.name,
+                "environment": env_dict,
+                "env_count": len(env_dict),
+            }
+        )
+    except Exception as e:
+        return ProbeResult(
+            probe_name=probe_name,
+            success=False,
+            error=f"{type(e).__name__}: {str(e)}",
+            data={
+                "container": getattr(container, "name", "unknown"),
+                "environment": {},
+                "env_count": 0,
+            }
+        )

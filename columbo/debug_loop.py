@@ -219,7 +219,8 @@ def execute_probe(
     container_cache: ContainerCache,
     probe_results_cache: dict,
     workspace_root: Optional[str] = None,
-    context: Optional['DebugContext'] = None
+    context: Optional['DebugContext'] = None,
+    excluded_probes: Optional[set] = None
 ) -> dict:
     """Execute a probe by looking it up in the probe registry.
     
@@ -230,10 +231,18 @@ def execute_probe(
         probe_results_cache: Dictionary storing previous probe results for reference
         workspace_root: Root path of the workspace (for file-related probes)
         context: Optional debug context for verbose output
+        excluded_probes: Set of probe names that are not allowed for this scenario
         
     Returns:
         dict: Probe result or error information
     """
+    # Check if probe is excluded for this scenario
+    if excluded_probes and probe_name in excluded_probes:
+        return {
+            "error": f"Probe '{probe_name}' is not available for this investigation",
+            "probe_name": probe_name
+        }
+    
     # Look up probe in registry
     if probe_name not in probe_registry:
         return {
@@ -330,7 +339,8 @@ def debug_loop(
     max_steps: int = 10, 
     workspace_root: Optional[str] = None,
     ui_callback: Optional[Any] = None,
-    verbose: Optional[bool] = None
+    verbose: Optional[bool] = None,
+    excluded_probes: Optional[set] = None
 ) -> dict:
     """Main debugging loop with hypothesis generation, probing,
     probe planning, execution, and evidence digestion.
@@ -341,6 +351,7 @@ def debug_loop(
         workspace_root: Root path of the workspace for file operations
         ui_callback: Optional UI handler for live updates (e.g., ColumboUI instance)
         verbose: Show verbose print statements (default: False if ui_callback, True otherwise)
+        excluded_probes: Set of probe names to exclude from this investigation
         
     Returns:
         dict: Final debugging results including evidence, hypotheses, and probes executed
@@ -373,14 +384,15 @@ def debug_loop(
     
     # Start MLflow tracing for the entire session
     with trace_session(session.session_id, initial_evidence, max_steps):
-        return _debug_loop_impl(context, session, evidence, ui_callback)
+        return _debug_loop_impl(context, session, evidence, ui_callback, excluded_probes)
 
 
 def _debug_loop_impl(
     context: DebugContext,
     session: DebugSession,
     evidence: str,
-    ui_callback: Optional[Any]
+    ui_callback: Optional[Any],
+    excluded_probes: Optional[set]
 ) -> dict:
     """Implementation of the debug loop (wrapped by trace_session).
     
@@ -389,6 +401,7 @@ def _debug_loop_impl(
         session: Debug session object
         evidence: Current evidence string
         ui_callback: Optional UI handler
+        excluded_probes: Set of probe names to exclude
         
     Returns:
         dict: Final debugging results
@@ -457,7 +470,7 @@ def _debug_loop_impl(
             if ui_callback:
                 ui_callback.update_activity("Planning diagnostic probe...")
             
-            tools_spec = build_tools_spec()
+            tools_spec = build_tools_spec(excluded_probes=excluded_probes)
             planning_input = ProbePlanningInput(
                 evidence=evidence,
                 hypotheses=hypotheses_str,  # Use string representation for LLM
@@ -527,7 +540,8 @@ def _debug_loop_impl(
                 container_cache=context.container_cache,
                 probe_results_cache=context.probe_results_cache,
                 workspace_root=context.workspace_root,
-                context=context
+                context=context,
+                excluded_probes=excluded_probes
             )
             
             probe_end = datetime.utcnow()
@@ -614,7 +628,9 @@ def _debug_loop_impl(
             )
             
             # Add finding summary to evidence log for LLM context
-            finding_entry = f"[Step {step + 1} - {probe_name}] {structured_finding.summary}"
+            # Use detailed_summary if available (more context for reasoning), fall back to summary
+            finding_text = structured_finding.detailed_summary or structured_finding.summary
+            finding_entry = f"[Step {step + 1} - {probe_name}] {finding_text}"
             context.evidence_log.append(finding_entry)
             
             context.vprint(f"\nNew finding:\n{structured_finding.summary}")

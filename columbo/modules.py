@@ -76,13 +76,22 @@ class EvidenceDigest(dspy.Signature):
     """Extract salient facts from probe results into a structured Finding.
     
     Create a Finding with:
-    - summary: CONCISE 1-2 sentence summary (~120 chars). Focus on actionable facts.
+    - summary: CONCISE 1-2 sentence summary (~120 chars) FOR UI DISPLAY ONLY. Focus on key headline facts.
+    - detailed_summary: COMPLETE analysis with ALL relevant details for agent reasoning (no length limit).
+      Include specific values, configuration details, and any context that might be relevant for diagnosis.
+      This is what the agent will see in future steps, so be thorough.
     - structured: Key-value pairs of important data (container names, ports, statuses, config values, etc.)
     - severity: info (default), warning (potential issue), critical (confirmed problem)
     
-    CRITICAL: Keep summary short and clear for UI display. Put details in structured dict.
-    Example good summary: "Both containers running and healthy. Qdrant exposed on 6333, rag-agent depends on it."
-    Example bad summary: "[Step 2 - docker_compose_parsing] docker-compose parsed (1 file). Services=2. qdrant: container_name=s001_qdrant, image=qdrant/qdrant:latest, host ports mapped 6333->6333 and 6334->6334..."
+    CRITICAL DISTINCTION:
+    - summary: Short headline for human display ("API container running, listening on port 8080")
+    - detailed_summary: Full context for agent reasoning ("API container s001_api is running with status 'running' (started 2m ago). Environment variables: QDRANT_HOST=qdrant, QDRANT_PORT=6333, QDRANT_URL=http://qdrant:6333, APP_CONFIG_PATH=/app/config/environment.yml, PYTHON_VERSION=3.12.12. The container has 9 total environment variables configured. Note: APP_CONFIG_PATH points to a YAML configuration file that may contain additional settings.")
+    
+    SPECIAL RULES FOR ENVIRONMENT PROBES:
+    - In detailed_summary: Include ALL connection-related env vars with exact values (HOST, PORT, URL, etc.)
+    - In detailed_summary: Include ALL config file paths with exact values (CONFIG_PATH, SETTINGS_FILE, etc.)
+    - In detailed_summary: Note if config file env vars exist - these may override other settings
+    - Example detailed_summary: "Container has QDRANT_HOST=qdrant and QDRANT_PORT=6333 from docker-compose. Also has APP_CONFIG_PATH=/app/config/environment.yml which points to a runtime config file that may override these values."
     """
     digest_input: EvidenceDigestInput = dspy.InputField()
     digest_output: DigestOutput = dspy.OutputField()
