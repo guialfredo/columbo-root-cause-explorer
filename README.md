@@ -14,21 +14,27 @@ Columbo is an intelligent root cause exploration engine that helps you investiga
 
 ## Overview
 
-**Origin Story:** Columbo was born from a frustrating debugging session right before the holidays. An environment variable override buried in a YAML config file caused a production-like failure that took way too much time to track down through manual container inspection, log diving, and configuration archaeology. Sound familiar?
+### 🎬 Origin Story
+
+Columbo was born from a frustrating debugging session right before the holidays. An environment variable override buried in a YAML config file caused a production-like failure that took way too much time to track down through manual container inspection, log diving, and configuration archaeology. Sound familiar?
 
 That bug became scenario `s001_env_override`, and the motivation to build something better.
 
-**Project Status:** Columbo is just a few days old—a holiday project that solved a real problem. It's functional and tested against real failure scenarios, but comes with a minimal test suite and plenty of rough edges. Contributions are especially welcome!
+### 🚧 Project Status
+
+Columbo is just a few days old, a holiday project that solved a real problem. It's functional and tested against real failure scenarios, but comes with a minimal test suite and plenty of rough edges. Contributions are especially welcome!
+
+### 🔍 How It Works
 
 As a lifelong Columbo fan, I've always admired the detective's smart yet humble investigating style: asking simple questions, following evidence methodically, and never making assumptions. "Just one more thing..." wasn't about showing off, it was about systematic, patient investigation until the truth emerged. That's exactly how debugging should work.
 
 Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, trial-and-error, or hoping ChatGPT remembers Docker networking, it guides a structured investigation:
 
-1. **Generating hypotheses** about potential root causes based on available evidence
-2. **Planning and executing diagnostic probes** to gather targeted evidence
-3. **Digesting findings** and updating its understanding iteratively
-4. **Deciding when to stop** based on evidence quality and explicit confidence criteria
-5. **Producing comprehensive diagnoses** with root causes and recommended fixes
+1. 💭 **Generating hypotheses** about potential root causes based on available evidence
+2. 🎯 **Planning and executing diagnostic probes** to gather targeted evidence
+3. 🧠 **Digesting findings** and updating its understanding iteratively
+4. ⏱️ **Deciding when to stop** based on evidence quality and explicit confidence criteria
+5. 📋 **Producing comprehensive diagnoses** with root causes and recommended fixes
 
 The agent operates entirely through structured probes—deterministic inspection tools that examine container states, logs, configurations, network connectivity, and more. No guessing, no hallucinations, just systematic evidence gathering and reasoning.
 
