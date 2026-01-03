@@ -160,8 +160,8 @@ class ColumboUI:
             if len(self.hypotheses) > 3:
                 inv_content.append(f"  [dim]...and {len(self.hypotheses) - 3} more[/dim]")
         
-        # Show current probe plan after hypotheses
-        if self.current_probe_plan:
+        # Show current probe plan after hypotheses (but not if we've decided to stop)
+        if self.current_probe_plan and not self.stop_decision:
             inv_content.append("")
             inv_content.append(f"[bold magenta]📋 Next Probe:[/bold magenta]")
             
@@ -195,11 +195,18 @@ class ColumboUI:
             inv_content.append("")
             inv_content.append("[bold]Decision:[/bold]")
             reasoning = self.stop_decision['reasoning']
-            # Keep first sentence only for conciseness
-            if '. ' in reasoning:
-                reasoning = reasoning[:reasoning.find('. ') + 1]
-            elif len(reasoning) > 120:
-                reasoning = reasoning[:117] + "..."
+            
+            # Allow up to 200 chars for stop decision (it's important context)
+            # Try to break at sentence boundary if needed
+            if len(reasoning) > 200:
+                # Look for last complete sentence within 200 chars
+                truncate_pos = 200
+                last_period = reasoning.rfind('. ', 0, truncate_pos)
+                if last_period > 100:  # Use sentence break if it's not too early
+                    reasoning = reasoning[:last_period + 1]
+                else:
+                    # No good sentence break, just truncate with ellipsis
+                    reasoning = reasoning[:197] + "..."
             
             if self.stop_decision["should_stop"]:
                 inv_content.append(f"  [bold red]🛑 Stop:[/bold red] {reasoning}")
@@ -301,7 +308,8 @@ class ColumboUI:
     def update_step(self, step: int):
         """Update current step number."""
         self.current_step = step
-        # Clear only probe plan from previous step (keep stop decision visible)
+        # Clear only probe plan from previous step
+        # Keep stop decision visible as context for why we're continuing
         self.current_probe_plan = None
         if self.progress_task is not None:
             self.progress.update(self.progress_task, completed=step)
@@ -317,6 +325,8 @@ class ColumboUI:
     def update_hypotheses(self, hypotheses: List[Dict[str, Any]]):
         """Update all active hypotheses."""
         self.hypotheses = hypotheses
+        # Clear previous stop decision now that we have new hypotheses (new round of thinking)
+        self.stop_decision = None
         if self.live:
             self.live.update(self.render())
     
