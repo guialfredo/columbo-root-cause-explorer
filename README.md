@@ -6,7 +6,7 @@
 
 </div>
 
-An intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
+Columbo is an intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
 
 ![Columbo Interactive UI](docs/Screenshot%202025-12-31%20at%2015.28.54.png)
 
@@ -18,11 +18,11 @@ An intelligent root cause exploration engine that helps you investigate failures
 
 That bug became scenario `s001_env_override`, and the motivation to build something better.
 
+**Project Status:** Columbo is just a few days old—a holiday project that solved a real problem. It's functional and tested against real failure scenarios, but comes with a minimal test suite and plenty of rough edges. Contributions are especially welcome!
+
 As a lifelong Columbo fan, I've always admired the detective's smart yet humble investigating style: asking simple questions, following evidence methodically, and never making assumptions. "Just one more thing..." wasn't about showing off, it was about systematic, patient investigation until the truth emerged. That's exactly how debugging should work.
 
 Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, trial-and-error, or hoping ChatGPT remembers Docker networking, it guides a structured investigation:
-
-Just as Columbo would start every case by carefully observing the crime scene—collecting every clue, no matter how small—Columbo (the tool) begins each investigation with the initial evidence you provide. This initial state frames the entire debugging session, guiding the agent's first hypotheses and lines of questioning.
 
 1. **Generating hypotheses** about potential root causes based on available evidence
 2. **Planning and executing diagnostic probes** to gather targeted evidence
@@ -34,44 +34,17 @@ The agent operates entirely through structured probes—deterministic inspection
 
 ## Design Principles
 
-### 1. 🎯 Evidence Over Speculation
-**The agent never reasons in a vacuum.** Every conclusion must be grounded in explicit, inspectable probe outputs. We reject approaches that allow LLMs to "guess" or "assume" system state. If it wasn't observed through a probe, it doesn't exist.
+### 🎯 Evidence Over Speculation
+Columbo never guesses. Every conclusion must be grounded in actual probe outputs—container states, logs, configurations, network tests. If it wasn't observed, it doesn't exist. This prevents hallucinations and ensures diagnoses are verifiable.
 
-*Why this matters:* Hallucinations in debugging are catastrophic. A fabricated log line or imagined container state leads to wrong fixes and wasted time.
+### 🔬 Hypothesis-Driven Reasoning
+Each probe is executed to test a specific hypothesis, not for random exploration. Like an experienced engineer, Columbo thinks before it acts: "I suspect X might be wrong, so I'll check Y to confirm." This keeps investigations focused and efficient.
 
-### 2. 🔬 Hypothesis-Driven Reasoning
-**Actions are not exploratory by default; they must be justified by an explicit hypothesis.** Each probe exists to confirm or refute a specific hypothesis, mirroring how experienced engineers debug. Random exploration wastes tokens, time, and obscures the investigation path.
+### 📋 Human-First Explainability
+Every investigation produces readable reports showing the full reasoning trail—what was checked, why, and what was found. Debugging is collaborative work. Columbo shows its work so teammates can verify findings, learn from the process, and reproduce investigations.
 
-*Why this matters:* The difference between a junior and senior engineer isn't knowledge—it's knowing what to check next. Columbo must think before it acts.
-
-### 3. ⚙️ Deterministic Tooling
-**Probes are deterministic, side-effect aware, and never hallucinate.** If a tool can lie, fail silently, or produce inconsistent results, the agent cannot be trusted. Every probe returns structured data or explicit error states—no exceptions raised, no undefined behavior.
-
-*Why this matters:* LLMs are probabilistic; infrastructure must not be. The system's uncertainty budget is already spent on reasoning—tools must be rock-solid.
-
-### 4. ⏱️ Bounded Investigation
-**The agent operates under explicit limits.** Step counts, confidence thresholds, and stop conditions are first-class constraints. Knowing when to stop investigating is as important as knowing what to investigate. Infinite loops and runaway investigations are system failures.
-
-*Why this matters:* Autonomy without bounds is recklessness. Real debugging has deadlines, cost constraints, and diminishing returns.
-
-### 5. 🧩 Separation of Reasoning and Execution
-**LLMs reason; probes observe.** This separation keeps uncertainty localized and failures understandable. Reasoning modules live in `modules.py`, probes in `probes/`. Never mix inspection logic with inference logic. Never mutate state outside defined update paths.
-
-*Why this matters:* When something goes wrong, we need to know if it's a reasoning failure (wrong hypothesis) or an execution failure (bad probe). Entangled concerns make debugging the debugger impossible.
-
-### 6. 📋 Human-First Explainability
-**Every investigation produces structured artifacts** (session state, findings, RCA report) intended for human review—not just machine consumption. Debugging is inherently collaborative. The agent must show its work, justify its reasoning, and produce artifacts that survive beyond the terminal session.
-
-*Why this matters:* A diagnosis without a trace is useless. Teammates need to verify findings, reproduce investigations, and learn from the agent's reasoning process.
-
-### 7. 🛡️ Type Safety as Documentation
-**Exploratory reasoning may be unstructured; anything persisted or shared must be typed.** They document data contracts, enforce invariants, and prevent entire classes of bugs. Untyped dictionaries passing between modules are code smells. If data moves between components, it has a schema.
-
-*Why this matters:* In a system where LLMs generate structured output, the schema IS the API contract. Runtime validation catches model drift and prompt regressions immediately.
-
----
-
-By design, we sacrifice flexibility for reliability, speed for correctness, and cleverness for clarity. If you want a system that "just explores" or "tries things," this isn't it. Columbo is built for systematic, evidence-based root cause analysis, the way debugging should be done.
+### ✅ Evaluation First
+Columbo is built to be tested. Real-world failure scenarios are encoded as reproducible test cases with known root causes. This ensures the agent actually works before you rely on it for production debugging.
 
 ## Architecture
 
@@ -110,226 +83,20 @@ flowchart LR
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design documentation.
 
-## Available Probes
+## Diagnostic Capabilities
 
-Columbo has access to a comprehensive toolkit of diagnostic probes organized by category:
+Columbo inspects your containerized environment across four key areas:
 
-### Container Inspection
-| Probe | Description |
-|-------|-------------|
-| `containers_state` | Check running/stopped status of all containers |
-| `container_inspect` | Detailed inspection including state, exit code, error messages, labels, and config |
-| `container_logs` | Retrieve recent logs from a specific container |
-| `container_exec` | Execute shell commands inside containers for diagnostics |
-| `containers_ports` | Show port mappings and detect port conflicts |
-| `container_mounts` | Inspect volume mounts and bind mount configurations |
-| `inspect_container_runtime_uid` | Check runtime UID/GID for permission debugging |
+- **Container Inspection** - Status, logs, configuration, ports, mounts, and runtime permissions
+- **Volume & File System** - Volume metadata, file contents, and permission analysis  
+- **Network Diagnostics** - DNS resolution, TCP/HTTP connectivity testing
+- **Configuration Analysis** - Docker Compose files, environment variables, and config parsing
 
-### Volume & File System
-| Probe | Description |
-|-------|-------------|
-| `list_volumes` | List all Docker volumes in the system |
-| `volume_metadata` | Get detailed volume information (driver, labels, mountpoint) |
-| `volume_data_inspection` | List files and directories within a volume |
-| `volume_file_read` | Read specific files from volumes |
-| `inspect_volume_file_permissions` | Check file ownership and permissions in volumes |
-
-### Network Diagnostics
-| Probe | Description |
-|-------|-------------|
-| `dns_resolution` | Resolve hostnames to IP addresses |
-| `tcp_connection` | Test TCP connectivity between containers |
-| `http_connection` | Test HTTP/HTTPS endpoints |
-
-### Configuration Analysis
-| Probe | Description |
-|-------|-------------|
-| `config_files_detection` | Discover configuration files (docker-compose.yml, .env, etc.) |
-| `docker_compose_parsing` | Parse and analyze docker-compose.yml files |
-| `env_files_parsing` | Parse .env files and extract environment variables |
-| `generic_config_parsing` | Parse YAML/JSON configuration files |
-
-Each probe is deterministic, never raises exceptions, and returns structured evidence suitable for LLM processing.
-
-## Installation
-
-### Prerequisites
-
-- Python 3.11-3.14
-- Docker Desktop or Docker Engine running locally
-- Poetry for dependency management
-- OpenAI API key (or compatible LLM endpoint)
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd columbo_root_cause_explorer
-```
-
-2. Install dependencies using Poetry:
-```bash
-poetry install
-```
-
-3. Configure your LLM API key:
-```bash
-# Create a .env file
-echo "OPENAI_API_KEY=your-api-key-here" > .env
-```
-
-> **Note**: By default, Columbo uses `gpt-5-mini`. You can configure a different model in the setup code.
-
-## Usage
-
-### Command-Line Interface (Recommended)
-
-The easiest way to use Columbo is via the CLI:
-
-```bash
-# Simple usage - describe the problem inline
-columbo debug "My app container fails to connect to postgres"
-
-# Load problem description from a file
-columbo debug --from-file problem.txt
-
-# Use interactive UI mode for live updates
-columbo debug --interactive "Service keeps crashing on startup"
-
-# Specify workspace and custom settings
-columbo debug "Port conflict error" \
-  --workspace /path/to/your/project \
-  --max-steps 10 \
-  --model openai/gpt-5-mini
-
-# Save results to a specific directory
-columbo debug "Network timeout" --output-dir ./debug_results
-```
-
-After installation with `poetry install`, the `columbo` command becomes available in your environment.
-
-**CLI Options:**
-- `--from-file PATH`: Read initial evidence from a text file
-- `--workspace PATH`: Path to your project root (default: current directory)
-- `--max-steps N`: Maximum debugging steps (default: 8)
-- `--interactive`: Enable Rich terminal UI with live updates
-- `--model MODEL`: LLM model to use (default: openai/gpt-5-mini)
-- `--output-dir PATH`: Where to save session results (default: ./columbo_sessions)
-- `--no-save`: Don't save session results to disk
-
-### Interactive UI Mode (Programmatic)
-
-For Python scripts, watch Columbo investigate in real-time with a live Terminal UI:
-
-```bash
-# Run on a specific scenario with interactive UI
-poetry run python evaluate_scenario.py s001_env_override --interactive
-
-# Run with cleanup to remove previous containers/volumes
-poetry run python evaluate_scenario.py s002_image_not_rebuilt --cleanup --interactive
-```
-
-**Available Scenarios:**
-- `s001_env_override` - Environment variable override by config file (Medium)
-- `s002_image_not_rebuilt` - Stale Docker image cache issue (Medium)
-- `s003_stale_volume` - Incompatible persistent volume data (Medium)
-- `s004_port_blocker` - Port conflict from leftover container (Easy)
-- `s005_permission_denied` - Volume permission mismatch (Medium)
-
-See [scenarios/README.md](scenarios/README.md) for detailed scenario descriptions.
-
-### Interactive UI Mode
-
-The `--interactive` flag launches a rich Terminal UI that shows the investigation in real-time:
-
-- 🔍 **Current Hypothesis** - What Columbo is investigating now
-- ⚙️ **Active Probe** - Live probe execution with spinner
-- 📊 **Latest Evidence** - Most recent findings
-- 📝 **Probe History** - All probes executed this session
-- 📈 **Progress** - Step counter and confidence level
-
-### Custom Debugging Session
-
-You can also use Columbo to debug your own containerized applications:
-
-```python
-from columbo.debug_loop import debug_loop
-from columbo.session_utils import save_session_to_file, generate_session_report
-import dspy
-
-# Configure LLM
-lm = dspy.LM("openai/gpt-4o-mini", api_key=your_api_key)
-dspy.configure(lm=lm)
-
-# Define your problem
-initial_evidence = """
-My application container is crashing on startup.
-Logs show "Connection refused" to database.
-"""
-
-# Run investigation
-session = debug_loop(
-    initial_problem=initial_evidence,
-    workspace_root="/path/to/your/project",
-    max_steps=10,
-    confidence_threshold="high"
-)
-
-# Save results
-save_session_to_file(session, "debug_sessions")
-generate_session_report(session, "debug_sessions")
-```
-
-## Session Structure
-
-Each debugging session is captured in a Pydantic model:
-
-```python
-class DebugSession(BaseModel):
-    session_id: str
-    initial_problem: str
-    workspace_root: Optional[str]
-    max_steps: int
-    probe_history: List[ProbeCall]
-    findings_log: List[Finding]
-    hypotheses_log: List[Hypothesis]
-    root_cause: Optional[RootCause]
-    # ... and more
-```
-
-This enables:
-- Type-safe access to session data
-- JSON serialization/deserialization
-- Computed fields (e.g., total execution time)
-- Validation and constraints
-
-## Configuration
-
-### LLM Configuration
-
-By default, the agent uses `gpt-5-mini` via DSPy. To use a different model:
-
-```python
-import dspy
-
-lm = dspy.LM("anthropic/claude-3-sonnet", api_key=api_key)
-dspy.configure(lm=lm)
-```
-
-### Probe Configuration
-
-To add a new probe:
-1. Create the probe function in the appropriate category file (e.g., `probes/container_probes.py`)
-2. Register it in `probes/registry.py` in the `probe_registry` dict
-3. Add schema documentation in `PROBE_SCHEMAS` (describes args for LLM)
-4. Follow the error-handling pattern: return errors as data, never raise exceptions
+All probes are deterministic, never raise exceptions, and return structured evidence suitable for analysis.
 
 ## Example Output
 
-After investigation, Columbo generates comprehensive reports with the diagnosis and full investigation trail.
-
-### Generated Markdown Report
+After investigation, Columbo generates comprehensive reports with the diagnosis and full investigation trail:
 
 ````markdown
 # Debug Session Report: abc123ef
@@ -376,47 +143,80 @@ backend service. The hostname should reference the service name from
 docker-compose for proper container-to-container communication.
 ````
 
-### Generated Artifacts
+## Installation
 
-Each session produces three files in `evaluation_results/`:
-- `debug_session_<id>.json` - Complete session state with all probes and findings
-- `report_<id>.md` - Human-readable investigation summary (shown above)
-- `evaluation_<id>.json` - Performance metrics and accuracy analysis
+### Prerequisites
 
-## Advanced Features
+- Python 3.11-3.14
+- Docker Desktop or Docker Engine running locally
+- Poetry for dependency management
+- OpenAI API key (or compatible LLM endpoint)
 
-### Probe Dependency Resolution
+### Setup
 
-The system automatically resolves probe dependencies. For example, `config_file_contents` depends on `config_files_detection`:
-
-```python
-PROBE_DEPENDENCIES = {
-    "config_file_contents": {
-        "requires": "config_files_detection",
-        "transform": lambda result: {"found_files": [f["path"] for f in result]}
-    }
-}
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd columbo_root_cause_explorer
 ```
 
-### Session Analytics
-
-```python
-from columbo.session_utils import analyze_probe_performance
-
-perf = analyze_probe_performance(session_model)
-print(f"Total time: {perf['total_time']:.2f}s")
-print(f"Success rate: {perf['success_rate']:.1%}")
+2. Install dependencies using Poetry:
+```bash
+poetry install
 ```
 
-### Signature-Based Deduplication
-
-The agent tracks probe signatures (name + args) to avoid redundant executions:
-
-```python
-signature = f"{probe_name}:{json.dumps(probe_args, sort_keys=True)}"
-if signature in executed_signatures:
-    print("⚠️  Probe already executed, skipping...")
+3. Configure your LLM API key:
+```bash
+# Create a .env file
+echo "OPENAI_API_KEY=your-api-key-here" > .env
 ```
+
+## Usage
+
+### Command-Line Interface (Recommended)
+
+The easiest way to use Columbo is via the CLI:
+
+```bash
+# Simple usage - describe the problem inline
+columbo debug "My app container fails to connect to postgres"
+
+# Load problem description from a file
+columbo debug --from-file problem.txt
+
+# Use interactive UI mode for live updates
+columbo debug --interactive "Service keeps crashing on startup"
+
+# Specify workspace and custom settings
+columbo debug "Port conflict error" \
+  --workspace /path/to/your/project \
+  --max-steps 10 \
+  --model openai/gpt-5-mini
+
+# Save results to a specific directory
+columbo debug "Network timeout" --output-dir ./debug_results
+```
+
+After installation with `poetry install`, the `columbo` command becomes available in your environment.
+
+**CLI Options:**
+- `--from-file PATH`: Read initial evidence from a text file
+- `--workspace PATH`: Path to your project root (default: current directory)
+- `--max-steps N`: Maximum debugging steps (default: 8)
+- `--interactive`: Enable Rich terminal UI with live updates
+- `--model MODEL`: LLM model to use (default: openai/gpt-5-mini)
+- `--output-dir PATH`: Where to save session results (default: ./columbo_sessions)
+- `--no-save`: Don't save session results to disk
+
+### Interactive UI
+
+The `--interactive` flag launches a rich Terminal UI that shows the investigation in real-time:
+
+- 🔍 **Current Hypothesis** - What Columbo is investigating now
+- ⚙️ **Active Probe** - Live probe execution with spinner
+- 📊 **Latest Evidence** - Most recent findings
+- 📝 **Probe History** - All probes executed this session
+- 📈 **Progress** - Step counter and confidence level
 
 ## Evaluation & Benchmarking
 
@@ -426,13 +226,22 @@ Columbo includes a comprehensive evaluation framework:
 
 ```bash
 # Evaluate a single scenario
-poetry run python evaluate_scenario.py s001_env_override --interactive
+poetry run python evaluation/evaluate_scenario.py s001_env_override --interactive
 
 # Run all scenarios
 for scenario in s001 s002 s003 s004 s005; do
-    poetry run python evaluate_scenario.py ${scenario}_* --cleanup
+    poetry run python evaluation/evaluate_scenario.py ${scenario}_* --cleanup
 done
 ```
+
+**Available Test Scenarios:**
+- `s001_env_override` - Environment variable override by config file (Medium)
+- `s002_image_not_rebuilt` - Stale Docker image cache issue (Medium)
+- `s003_stale_volume` - Incompatible persistent volume data (Medium)
+- `s004_port_blocker` - Port conflict from leftover container (Easy)
+- `s005_permission_denied` - Volume permission mismatch (Medium)
+
+See [scenarios/README.md](scenarios/README.md) for detailed scenario descriptions.
 
 ### Evaluation Metrics
 
