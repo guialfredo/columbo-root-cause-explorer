@@ -18,7 +18,14 @@ from columbo.schemas import (
 # ============================================================================
 
 class HypothesesFromEvidence(dspy.Signature):
-    """Generate hypotheses from current evidence."""
+    """Generate 3-5 ranked hypotheses from current evidence.
+    
+    Output structured Hypothesis objects with:
+    - id: H1, H2, H3, etc. (sequential)
+    - statement: Clear, testable hypothesis about the root cause
+    - confidence: low/medium/high based on available evidence
+    - rationale: Brief explanation of why this hypothesis is plausible
+    """
     evidence_input: EvidenceInput = dspy.InputField()
     hypotheses_output: HypothesesOutput = dspy.OutputField()
 

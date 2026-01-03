@@ -131,12 +131,12 @@ class ColumboUI:
                 desc = desc.strip()
                 desc = re.sub(r'^H\d+:\s*', '', desc)
                 
-                # Aggressive truncate for compact display - aim for ~65 chars max
-                # First, try to find a natural break point early (dash, comma, em-dash)
-                truncate_at = 65
+                # Truncate for display - aim for ~110 chars max to show more context
+                # First, try to find a natural break point (dash, comma, em-dash)
+                truncate_at = 110
                 for delimiter in [' — ', ' - ', ', ', '; ']:
                     pos = desc.find(delimiter)
-                    if 20 < pos < truncate_at:
+                    if 30 < pos < truncate_at:
                         desc = desc[:pos]
                         break
                 else:
