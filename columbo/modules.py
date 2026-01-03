@@ -150,9 +150,11 @@ Stop criteria (should_stop='yes') require ALL of:
 4) For volume/data issues: actual data values have been inspected, not just inferred.
 
 If steps_remaining is small, prioritize the single most discriminating missing piece of evidence.
+
 Output format rules:
 - should_stop must be exactly 'yes' or 'no'
 - If should_stop='yes', missing_evidence must be 'none'
+- reasoning: CONCISE 1-2 sentence explanation (~150 chars max). Focus on the key discriminating fact.
 """
         )
 
