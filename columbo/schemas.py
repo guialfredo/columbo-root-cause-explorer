@@ -153,7 +153,7 @@ class StopDecisionOutput(BaseModel):
     )
     reasoning: str = Field(
         ...,
-        description="2-3 sentences explaining the decision, strictly evidence-based."
+        description="CONCISE explanation (1-2 sentences, ~150 chars max) of the decision. Focus on key discriminating evidence."
     )
 
 
