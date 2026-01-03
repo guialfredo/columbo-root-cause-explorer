@@ -5,6 +5,11 @@
   "category": "build-configuration",
   "grading": {
     "expected_root_cause_id": "IMAGE_NOT_REBUILT",
+    "mandatory_probes": [
+      "env_files_parsing",
+      "docker_compose_parsing",
+      "container_inspect"
+    ],
     "proof_requirements": [
       { 
         "type": "file_value", 

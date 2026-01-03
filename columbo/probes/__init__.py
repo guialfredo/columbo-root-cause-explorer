@@ -2,19 +2,27 @@
 
 This package provides a modular structure for container, volume, network,
 and configuration probes used in debugging containerized systems.
+
+The new unified probe specification (ProbeSpec) combines function references,
+metadata for selection, and IO contracts. Use PROBES dict for the new API.
 """
 
+from .spec import ProbeSpec, PROBES, probe
 from .container_probes import (
     containers_state_probe,
     container_logs_probe,
     container_exec_probe,
     container_mounts_probe,
+    containers_ports_probe,
+    container_inspect_probe,
+    inspect_container_runtime_uid,
 )
 from .volume_probes import (
     list_volumes_probe,
     volume_metadata_probe,
     volume_data_inspection_probe,
     volume_file_read_probe,
+    inspect_volume_file_permissions,
 )
 from .network_probes import (
     dns_resolution_probe,
@@ -41,16 +49,24 @@ from .utils import (
 )
 
 __all__ = [
+    # New unified probe specification API
+    "ProbeSpec",
+    "PROBES",
+    "probe",
     # Container probes
     "containers_state_probe",
     "container_logs_probe",
     "container_exec_probe",
     "container_mounts_probe",
+    "containers_ports_probe",
+    "container_inspect_probe",
+    "inspect_container_runtime_uid",
     # Volume probes
     "list_volumes_probe",
     "volume_metadata_probe",
     "volume_data_inspection_probe",
     "volume_file_read_probe",
+    "inspect_volume_file_permissions",
     # Network probes
     "dns_resolution_probe",
     "tcp_connection_probe",
@@ -60,7 +76,7 @@ __all__ = [
     "env_files_parsing_probe",
     "docker_compose_parsing_probe",
     "generic_config_parsing_probe",
-    # Registry
+    # Registry (backward compatible)
     "probe_registry",
     "PROBE_SCHEMAS",
     "PROBE_DEPENDENCIES",

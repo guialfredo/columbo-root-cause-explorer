@@ -26,10 +26,21 @@ def save_session_to_file(session: DebugSession, output_dir: str = "."):
         session: The DebugSession instance
         output_dir: Directory to save the file
     """
-    output_path = Path(output_dir) / f"debug_session_{session.session_id}.json"
+    output_dir_path = Path(output_dir)
+    output_dir_path.mkdir(parents=True, exist_ok=True)
     
-    # Use Pydantic's model_dump for JSON serialization
-    session_data = session.model_dump(mode='json')
+    output_path = output_dir_path / f"debug_session_{session.session_id}.json"
+    
+    # Use Pydantic's model_dump for JSON serialization, excluding computed fields
+    # Note: computed fields should not be serialized as they'll be recomputed on load
+    session_data = session.model_dump(
+        mode='json',
+        exclude={
+            'is_complete': True,
+            'steps_remaining': True,
+            'probe_history': {'__all__': {'duration_seconds': True, 'success': True}}
+        }
+    )
     
     with open(output_path, 'w') as f:
         json.dump(session_data, f, indent=2, default=str)
