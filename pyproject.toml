@@ -7,6 +7,7 @@ name = "columbo"
 version = "0.1.0"
 description = "Columbo is a debugging assistant specialized in local container based architectures (for the moment)"
 readme = "README.md"
+license = "MIT"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.15"
