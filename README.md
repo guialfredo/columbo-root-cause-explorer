@@ -6,66 +6,148 @@
 
 </div>
 
-An intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
+Columbo is an intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
+
+![Columbo Interactive UI](docs/Screenshot%202025-12-31%20at%2015.28.54.png)
+
+*Watch Columbo investigate in real-time with the interactive Terminal UI*
 
 ## Overview
 
-Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, it guides a structured investigation by:
+### 🎬 Origin Story
 
-1. **Generating hypotheses** about potential root causes based on available evidence
-2. **Planning and executing diagnostic probes** to gather targeted evidence
-3. **Digesting findings** and updating its understanding iteratively
-4. **Deciding when to stop** based on evidence quality and explicit confidence criteria
-5. **Producing comprehensive diagnoses** with root causes and recommended fixes
+Columbo was born from a frustrating debugging session right before the holidays. An environment variable override buried in a YAML config file caused a production-like failure that took way too much time to track down through manual container inspection, log diving, and configuration archaeology. Sound familiar?
 
-The agent operates entirely through structured probes—deterministic inspection tools that examine container states, logs, configurations, network connectivity, and more.
+That bug became scenario `s001_env_override`, and the motivation to build something better.
 
-## Key Features
+### 🚧 Project Status
 
-- 🔍 **Hypothesis-Driven Investigation**: Generates and tests hypotheses systematically
-- 🤖 **Autonomous Multi-Turn Reasoning**: Continues investigating until confident or max steps reached
-- 🐳 **Container-Native**: Built-in probes for Docker containers, logs, exec commands, and networking
-- 📊 **Structured Session Tracking**: Pydantic models for type-safe session management
-- 🔄 **Dependency Resolution**: Automatic probe dependency management
-- 📝 **Rich Reporting**: JSON artifacts and Markdown reports with full session history
-- 🎯 **Smart Caching**: Avoids redundant probe executions through signature-based deduplication
+Columbo is just a few days old, a holiday project that solved a real problem. It's functional and tested against real failure scenarios, but comes with a minimal test suite and plenty of rough edges. Contributions are especially welcome!
+
+### 🔍 How It Works
+
+As a lifelong Columbo fan, I've always admired the detective's smart yet humble investigating style: asking simple questions, following evidence methodically, and never making assumptions. "Just one more thing..." wasn't about showing off, it was about systematic, patient investigation until the truth emerged. That's exactly how debugging should work.
+
+Columbo systematically investigates issues in your local containerized environments using hypothesis-driven reasoning. Instead of ad-hoc manual inspection, trial-and-error, or hoping ChatGPT remembers Docker networking, it guides a structured investigation:
+
+1. 💭 **Generating hypotheses** about potential root causes based on available evidence
+2. 🎯 **Planning and executing diagnostic probes** to gather targeted evidence
+3. 🧠 **Digesting findings** and updating its understanding iteratively
+4. ⏱️ **Deciding when to stop** based on evidence quality and explicit confidence criteria
+5. 📋 **Producing comprehensive diagnoses** with root causes and recommended fixes
+
+The agent operates entirely through structured probes—deterministic inspection tools that examine container states, logs, configurations, network connectivity, and more. No guessing, no hallucinations, just systematic evidence gathering and reasoning.
+
+## Design Principles
+
+### 🎯 Evidence Over Speculation
+Columbo never guesses. Every conclusion must be grounded in actual probe outputs—container states, logs, configurations, network tests. If it wasn't observed, it doesn't exist. This prevents hallucinations and ensures diagnoses are verifiable.
+
+### 🔬 Hypothesis-Driven Reasoning
+Each probe is executed to test a specific hypothesis, not for random exploration. Like an experienced engineer, Columbo thinks before it acts: "I suspect X might be wrong, so I'll check Y to confirm." This keeps investigations focused and efficient.
+
+### 📋 Human-First Explainability
+Every investigation produces readable reports showing the full reasoning trail—what was checked, why, and what was found. Debugging is collaborative work. Columbo shows its work so teammates can verify findings, learn from the process, and reproduce investigations.
+
+### ✅ Evaluation First
+Columbo is built to be tested. Real-world failure scenarios are encoded as reproducible test cases with known root causes. This ensures the agent actually works before you rely on it for production debugging.
 
 ## Architecture
 
-```
-User Problem → Debug Loop → [Generate Hypotheses → Plan Probe → Execute → Digest Evidence] → Final Diagnosis
-                    ↓
-            DebugSession (Pydantic)
-                    ↓
-        [ProbeCall, Finding, Hypothesis, RootCause]
-                    ↓
-            Save to JSON + Generate Report
+```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#6366f1','primaryTextColor':'#fff','primaryBorderColor':'#4f46e5','lineColor':'#8b5cf6','secondaryColor':'#a78bfa','tertiaryColor':'#c4b5fd','background':'#faf5ff'}}}%%
+flowchart LR
+    A["🔍<br/><b>Problem</b>"]
+    B["💭<br/><b>Generate<br/>Hypotheses</b>"]
+    C["🎯<br/><b>Plan<br/>Probe</b>"]
+    D["⚙️<br/><b>Execute<br/>Probe</b>"]
+    E["🧠<br/><b>Digest<br/>Evidence</b>"]
+    F["📋<br/><b>Diagnosis</b>"]
+    
+    A --> B
+    B --> C
+    C --> D
+    D --> E
+    E -->|"🔄 Continue?"| B
+    E -->|"✅ Done"| F
+    
+    classDef startEnd fill:#10b981,stroke:#059669,stroke-width:3px,color:#fff
+    classDef reasoning fill:#6366f1,stroke:#4f46e5,stroke-width:2px,color:#fff
+    classDef execution fill:#8b5cf6,stroke:#7c3aed,stroke-width:2px,color:#fff
+    
+    class A,F startEnd
+    class B,C,E reasoning
+    class D execution
 ```
 
-The system uses:
-- **DSPy** for LLM-powered reasoning modules
-- **Pydantic** for type-safe data models and validation
-- **Docker SDK** for container introspection
-- **Structured converters** to bridge LLM outputs with Pydantic models
+**The Investigation Loop:**
+1. **💭 Generate Hypotheses** - LLM proposes what might be wrong based on current evidence
+2. **🎯 Plan Probe** - LLM selects the best diagnostic tool to test the hypothesis
+3. **⚙️ Execute Probe** - Deterministic inspection of containers, logs, configs, network
+4. **🧠 Digest Evidence** - LLM analyzes results and updates understanding
+5. **🔄 Repeat or Complete** - Continue until confident or max steps reached
 
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for detailed design documentation.
 
-## Available Probes
+## Diagnostic Capabilities
 
-The agent has access to a comprehensive toolkit of diagnostic probes:
+Columbo inspects your containerized environment across four key areas:
 
-| Probe | Description |
-|-------|-------------|
-| `containers_state` | Check running/stopped status of all containers |
-| `container_logs` | Retrieve recent logs from a specific container |
-| `container_exec` | Execute shell commands inside containers |
-| `network_probes` | Test connectivity between containers |
-| `config_files_detection` | Discover configuration files (docker-compose.yml, .env, etc.) |
-| `config_file_contents` | Read and analyze configuration files |
-| `port_checks` | Verify port bindings and exposure |
-| `env_vars_inspection` | Examine environment variables in containers |
+- **Container Inspection** - Status, logs, configuration, ports, mounts, and runtime permissions
+- **Volume & File System** - Volume metadata, file contents, and permission analysis  
+- **Network Diagnostics** - DNS resolution, TCP/HTTP connectivity testing
+- **Configuration Analysis** - Docker Compose files, environment variables, and config parsing
 
-Each probe is deterministic, never raises exceptions, and returns structured evidence suitable for LLM processing.
+All probes are deterministic, never raise exceptions, and return structured evidence suitable for analysis.
+
+## Example Output
+
+After investigation, Columbo generates comprehensive reports with the diagnosis and full investigation trail:
+
+````markdown
+# Debug Session Report: abc123ef
+
+**Session Started:** 2025-12-31 10:15:30 UTC
+**Session Ended:** 2025-12-31 10:18:45 UTC
+**Total Duration:** 195.2 seconds
+**Steps Used:** 3/10
+
+## Initial Problem
+
+Application container fails to connect to backend service.
+Connection errors in logs, both containers appear to be running.
+
+## Probes Executed (3)
+
+### Step 1: containers_state
+| Container | Status | Healthy |
+|-----------|--------|---------|
+| app_frontend | running | ✓ |
+| app_backend | running | ✓ |
+| app_database | running | ✓ |
+
+### Step 2: container_logs
+**Container:** app_frontend
+```
+[ERROR] Failed to connect to backend service
+Configuration loaded: backend_host=localhost:8080
+Retrying connection... (attempt 5/10)
+Connection refused on localhost:8080
+```
+
+### Step 3: docker_compose_parsing
+**Service configuration:**
+- backend service name: `app_backend`
+- frontend environment: `BACKEND_HOST=localhost:8080`
+- Expected: `BACKEND_HOST=app_backend:8080`
+
+## Diagnosis
+
+The frontend container is configured with BACKEND_HOST=localhost:8080, 
+causing it to attempt connections to its own container rather than the 
+backend service. The hostname should reference the service name from 
+docker-compose for proper container-to-container communication.
+````
 
 ## Installation
 
@@ -73,6 +155,7 @@ Each probe is deterministic, never raises exceptions, and returns structured evi
 
 - Python 3.11-3.14
 - Docker Desktop or Docker Engine running locally
+- Poetry for dependency management
 - OpenAI API key (or compatible LLM endpoint)
 
 ### Setup
@@ -80,21 +163,15 @@ Each probe is deterministic, never raises exceptions, and returns structured evi
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd api_tests
+cd columbo_root_cause_explorer
 ```
 
-2. Create and activate a conda environment:
-```bash
-conda env create -f environment.yaml
-conda activate api_test
-```
-
-3. Install dependencies:
+2. Install dependencies using Poetry:
 ```bash
 poetry install
 ```
 
-4. Configure your LLM API key:
+3. Configure your LLM API key:
 ```bash
 # Create a .env file
 echo "OPENAI_API_KEY=your-api-key-here" > .env
@@ -137,248 +214,90 @@ After installation with `poetry install`, the `columbo` command becomes availabl
 - `--output-dir PATH`: Where to save session results (default: ./columbo_sessions)
 - `--no-save`: Don't save session results to disk
 
-### Interactive UI Mode (Programmatic)
+### Interactive UI
 
-For Python scripts, watch Columbo investigate in real-time with a live Terminal UI:
+The `--interactive` flag launches a rich Terminal UI that shows the investigation in real-time:
 
-```python
-from columbo.debug_loop import debug_loop
-from columbo.ui import ColumboUI
+- 🔍 **Current Hypothesis** - What Columbo is investigating now
+- ⚙️ **Active Probe** - Live probe execution with spinner
+- 📊 **Latest Evidence** - Most recent findings
+- 📝 **Probe History** - All probes executed this session
+- 📈 **Progress** - Step counter and confidence level
 
-# Define your problem
-initial_evidence = """
-My rag-agent is failing to connect to my vectordb container.
-No error details visible in the logs.
+## Evaluation & Benchmarking
 
-Context:
-- Vectordb should be running in a Docker container
-- Expected to be accessible from the rag-agent container
-- docker-compose.yml exists in the project root
-"""
+Columbo includes a comprehensive evaluation framework:
 
-# Create interactive UI
-ui = ColumboUI(max_steps=6)
-ui.start()
-
-try:
-    # Run with live updates
-    result = debug_loop(
-        initial_evidence=initial_evidence,
-        max_steps=6,
-        workspace_root="/path/to/your/project",
-        ui_callback=ui
-    )
-    
-    # Show final diagnosis
-    ui.show_final_diagnosis(result["diagnosis"])
-finally:
-    ui.stop()
-```
-
-The interactive UI shows:
-- 🔍 Current hypothesis being tested
-- ⚙️ Active probe execution with spinner
-- 📊 Latest evidence collected
-- 📝 History of all probes
-- 📈 Progress bar and confidence level
-
-### Programmatic Usage (Silent Mode)
-
-For scripting or automation, run without UI:
-
-```python
-from columbo.debug_loop import debug_loop
-from columbo.session_utils import save_session_to_file, generate_session_report
-
-# Run the debug loop
-result = debug_loop(
-    initial_evidence=initial_evidence,
-    max_steps=6,
-    workspace_root="/path/to/your/project",
-    ui_callback=None  # No UI
-)
-
-# Access results
-diagnosis = result["diagnosis"]
-session_model = result["session_model"]
-
-print(f"Root Cause: {diagnosis['root_cause']}")
-print(f"Confidence: {diagnosis['confidence']}")
-print(f"Recommended Fixes: {diagnosis['recommended_fixes']}")
-
-# Save session artifacts
-save_session_to_file(session_model, directory="./debug_sessions")
-generate_session_report(session_model, output_dir="./debug_sessions")
-```
-
-### Running Examples
-
-The project includes example entry points:
+### Running Evaluations
 
 ```bash
-# Interactive UI mode with example problem
-python -m columbo.main_interactive
+# Evaluate a single scenario
+poetry run python evaluation/evaluate_scenario.py s001_env_override --interactive
 
-# Classic verbose mode with example problem
-python -m columbo.main
-
-# Evaluate on a test scenario (for development/testing)
-python evaluation/evaluate_scenario.py s001_env_override --interactive
+# Run all scenarios
+for scenario in s001 s002 s003 s004 s005; do
+    poetry run python evaluation/evaluate_scenario.py ${scenario}_* --cleanup
+done
 ```
 
-The main examples will run against the bundled scenario and save:
-- `debug_session_<id>.json`: Full session data with all probes and findings
-- `report_<id>.md`: Human-readable markdown report
+**Available Test Scenarios:**
+- `s001_env_override` - Environment variable override by config file (Medium)
+- `s002_image_not_rebuilt` - Stale Docker image cache issue (Medium)
+- `s003_stale_volume` - Incompatible persistent volume data (Medium)
+- `s004_port_blocker` - Port conflict from leftover container (Easy)
+- `s005_permission_denied` - Volume permission mismatch (Medium)
 
-## Session Structure
+See [scenarios/README.md](scenarios/README.md) for detailed scenario descriptions.
 
-Each debugging session is captured in a strongly-typed Pydantic model:
+### Evaluation Metrics
 
-```python
-class DebugSession(BaseModel):
-    session_id: str
-    initial_problem: str
-    workspace_root: Optional[str]
-    max_steps: int
-    probe_history: List[ProbeCall]
-    findings_log: List[Finding]
-    hypotheses_log: List[Hypothesis]
-    root_cause: Optional[RootCause]
-    # ... and more
-```
-
-This enables:
-- Type-safe access to session data
-- JSON serialization/deserialization
-- Computed fields (e.g., total execution time)
-- Validation and constraints
-
-## Configuration
-
-### LLM Configuration
-
-By default, the agent uses `gpt-5-mini` via DSPy. To use a different model:
-
-```python
-import dspy
-
-lm = dspy.LM("anthropic/claude-3-sonnet", api_key=api_key)
-dspy.configure(lm=lm)
-```
-
-### Probe Configuration
-
-Probes are organized in the `probes/` directory by category. Each probe follows this signature:
-
-```python
-def my_custom_probe(containers, probe_name: str, **kwargs):
-    """
-    Returns: dict with evidence data
-    - Never raises exceptions
-    - Returns structured data suitable for LLM digestion
-    """
-    return {"evidence": "..."}
-```
-
-Add new probes to the appropriate category file (e.g., `probes/container_probes.py`), register them in `probes/registry.py`, and document them in `PROBE_SCHEMAS`.
-
-## Example Output
-
-```
-DEBUGGING SESSION COMPLETE
-======================================================================
-
-Total probing steps: 5
-Session ID: 156eb7fc
-
-======================================================================
-DIAGNOSIS SUMMARY
-======================================================================
-
-Root Cause:
-The rag-agent container cannot resolve the hostname 'vectordb' because 
-the vector database container is not running. The docker-compose.yml 
-defines it as 'chromadb' but it's stopped.
-
-Confidence: high
-
-Recommended Fixes:
-1. Start the chromadb container: docker compose up -d chromadb
-2. Verify network connectivity: docker network inspect api_tests_default
-3. Update rag-agent to use correct hostname 'chromadb' instead of 'vectordb'
-```
-
-## Project Structure
-
-```
-api_tests/
-├── columbo/
-│   ├── debug_loop.py        # Main debug loop orchestration
-│   ├── modules.py           # DSPy reasoning modules
-│   ├── probes/              # Diagnostic probe implementations
-│   │   ├── __init__.py      # Public API exports
-│   │   ├── container_probes.py  # Container inspection probes
-│   │   ├── volume_probes.py     # Volume inspection probes
-│   │   ├── network_probes.py    # Network connectivity probes
-│   │   ├── config_probes.py     # Config file parsing probes
-│   │   ├── registry.py      # Probe registry and schemas
-│   │   └── utils.py         # Validation and utility functions
-│   ├── schemas.py           # Pydantic data models
-│   └── session_utils.py     # Session persistence and reporting
-├── debug_sessions/          # Saved debugging sessions and reports
-├── docs/
-│   └── ARCHITECTURE.md      # Detailed architecture documentation
-├── rag_agent/               # Example containerized application
-├── docker-compose.yml
-└── README.md
-```
-
-## Advanced Features
-
-### Probe Dependency Resolution
-
-The system automatically resolves probe dependencies. For example, `config_file_contents` depends on `config_files_detection`:
-
-```python
-PROBE_DEPENDENCIES = {
-    "config_file_contents": {
-        "requires": "config_files_detection",
-        "transform": lambda result: {"found_files": [f["path"] for f in result]}
-    }
-}
-```
-
-### Session Analytics
-
-```python
-from columbo.session_utils import analyze_probe_performance
-
-perf = analyze_probe_performance(session_model)
-print(f"Total time: {perf['total_time']:.2f}s")
-print(f"Success rate: {perf['success_rate']:.1%}")
-```
-
-### Signature-Based Deduplication
-
-The agent tracks probe signatures (name + args) to avoid redundant executions:
-
-```python
-signature = f"{probe_name}:{json.dumps(probe_args, sort_keys=True)}"
-if signature in executed_signatures:
-    print("⚠️  Probe already executed, skipping...")
-```
+TO BE COMPLETED
 
 ## Contributing
 
-Contributions welcome! Areas for enhancement:
-- Additional probe types (filesystem, process inspection, etc.)
-- Support for non-Docker containerization (Kubernetes, Podman)
-- Multi-container orchestration debugging
-- Integration with observability tools (Prometheus, Grafana)
+Contributions welcome! Key areas for enhancement:
+
+### New Scenarios
+
+Add evaluation scenarios (`scenarios/sXXX_name/`) to test new bug patterns:
+- Timing issues (race conditions, startup ordering)
+- Resource exhaustion (OOM, disk space, connection pools)
+- Multi-service failures (cascading failures, circular dependencies)
+- Configuration complexity (secrets, dynamic configs)
+- Security issues (certificates, credential rotation)
+
+Each scenario needs: `manifest.json`, `docker-compose.yml`, app code, and `README.md`
+
+### New Probes
+
+**Process & Resources**: CPU/memory/disk monitoring, process inspection (`ps`, `top`)  
+**Application-Specific**: Database checks (PostgreSQL, MySQL), cache inspection (Redis), message queues (Kafka, RabbitMQ)  
+**Advanced Debugging**: Tracing (Jaeger), metrics (Prometheus), structured log parsing, profiling
+
+### Guidelines
+
+1. Probes must be deterministic and exception-safe
+2. Follow Pydantic patterns for all data structures
+3. Scenarios must include expected outcomes
+4. Update probe registry and documentation
+5. Preserve reasoning/execution separation
+
+See [.github/copilot-instructions.md](.github/copilot-instructions.md) for architectural principles.
+
+## Future Enhancements
+
+**Platform Expansion**  
+Kubernetes (pods, services, ConfigMaps), Docker Swarm (tasks, overlay networks), Podman (rootless containers, SELinux)
+
+**Observability & Storage**  
+Long-term diagnosis database with pattern recognition, investigation history, team-wide knowledge base, correlation with Prometheus/Grafana/Jaeger/ELK
+
+**Advanced Features**  
+Multi-cluster debugging, CI/CD integration, chat bots (Slack/Discord), automated remediation with approval, ML-powered anomaly detection
 
 ## License
 
-[Add your license here]
+MIT License - See LICENSE file for details
 
 ## Acknowledgments
 
@@ -386,6 +305,3 @@ Built with:
 - [DSPy](https://github.com/stanfordnlp/dspy) for LLM programming
 - [Pydantic](https://pydantic.dev/) for data validation
 - [Docker SDK for Python](https://docker-py.readthedocs.io/)
-
-
-
