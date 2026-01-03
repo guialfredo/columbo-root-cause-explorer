@@ -18,7 +18,26 @@ from columbo.schemas import (
 # ============================================================================
 
 class HypothesesFromEvidence(dspy.Signature):
-    """Generate hypotheses from current evidence."""
+    """Generate 3-5 ranked hypotheses from current evidence.
+    
+    Output structured Hypothesis objects with:
+    - id: H1, H2, H3, etc. (sequential)
+    - statement: CONCISE one-sentence hypothesis (~10-15 words max). Focus on the core issue.
+    - confidence: low/medium/high based on available evidence
+    - rationale: Brief explanation with supporting details (this can be longer)
+    
+    CRITICAL: Keep statements short and punchy for UI display. Put elaboration in rationale.
+    Example good statement: "Vectordb service not reachable from rag-agent container"
+    Example bad statement: "The rag-agent cannot reach the vectordb because the two containers are on different networks and there is no shared network configured in docker-compose"
+    
+    CONFIDENCE RANKING: 
+    - Rank hypotheses by likelihood/evidence strength
+    - Use DIFFERENT confidence levels to show your ranking (high > medium > low)
+    - H1 should typically have higher confidence than H4
+    - high: Strong direct evidence supports this hypothesis
+    - medium: Some evidence points this way but not conclusive
+    - low: Plausible but speculative without strong evidence
+    """
     evidence_input: EvidenceInput = dspy.InputField()
     hypotheses_output: HypothesesOutput = dspy.OutputField()
 
@@ -39,6 +58,12 @@ class NextProbePlan(dspy.Signature):
     - If the evidence mentions specific containers, use that exact name
     - If multiple containers exist, choose the most relevant one based on the error/hypothesis
     - If a required value is not in the evidence, choose a probe that will discover it first
+    
+    EXPECTED SIGNAL:
+    - Keep it CONCISE (~80 chars max) for UI display
+    - Focus on the KEY discriminator this probe reveals
+    - Example good: "Will show if qdrant container is running and what networks it's on"
+    - Example bad: "The containers_state output will list all Docker containers and their statuses. Confirmation of H1: there is no container corresponding to the vectordb service, or there is a vectordb container but it is not running or has crashed. Refutation of H1..."
     """
     planning_input: ProbePlanningInput = dspy.InputField()
     probe_plan: ProbePlan = dspy.OutputField()
@@ -48,7 +73,17 @@ probe_planner = dspy.Predict(NextProbePlan)
 
 
 class EvidenceDigest(dspy.Signature):
-    """Extract salient facts from probe results."""
+    """Extract salient facts from probe results into a structured Finding.
+    
+    Create a Finding with:
+    - summary: CONCISE 1-2 sentence summary (~120 chars). Focus on actionable facts.
+    - structured: Key-value pairs of important data (container names, ports, statuses, config values, etc.)
+    - severity: info (default), warning (potential issue), critical (confirmed problem)
+    
+    CRITICAL: Keep summary short and clear for UI display. Put details in structured dict.
+    Example good summary: "Both containers running and healthy. Qdrant exposed on 6333, rag-agent depends on it."
+    Example bad summary: "[Step 2 - docker_compose_parsing] docker-compose parsed (1 file). Services=2. qdrant: container_name=s001_qdrant, image=qdrant/qdrant:latest, host ports mapped 6333->6333 and 6334->6334..."
+    """
     digest_input: EvidenceDigestInput = dspy.InputField()
     digest_output: DigestOutput = dspy.OutputField()
 
@@ -115,9 +150,11 @@ Stop criteria (should_stop='yes') require ALL of:
 4) For volume/data issues: actual data values have been inspected, not just inferred.
 
 If steps_remaining is small, prioritize the single most discriminating missing piece of evidence.
+
 Output format rules:
 - should_stop must be exactly 'yes' or 'no'
 - If should_stop='yes', missing_evidence must be 'none'
+- reasoning: CONCISE 1-2 sentence explanation (~150 chars max). Focus on the key discriminating fact.
 """
         )
 

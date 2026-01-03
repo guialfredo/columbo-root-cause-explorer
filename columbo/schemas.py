@@ -90,9 +90,9 @@ class HypothesesOutput(BaseModel):
     """Structured output for hypothesis generation."""
     model_config = ConfigDict(extra="forbid")
 
-    hypotheses: str = Field(
+    hypotheses: List[Hypothesis] = Field(
         ..., 
-        description="3-5 hypotheses, ranked. Each: 'H#: ... | confidence: low/med/high | why'."
+        description="3-5 ranked hypotheses about the root cause. Each must have id, statement, confidence, and optionally rationale."
     )
     key_unknowns: str = Field(
         ...,
@@ -114,7 +114,10 @@ class ProbePlan(BaseModel):
             "If a value is not in evidence, use a different probe to discover it first."
         )
     )
-    expected_signal: str = Field(..., description="What would confirm/refute the top hypothesis.")
+    expected_signal: str = Field(
+        ..., 
+        description="CONCISE statement (~80 chars) of what this probe will reveal. Focus on key discriminator."
+    )
     stop_if: str = Field(..., description="Condition to stop probing and move to final diagnosis.")
 
 
@@ -122,9 +125,9 @@ class DigestOutput(BaseModel):
     """Structured output for evidence digestion."""
     model_config = ConfigDict(extra="forbid")
 
-    updated_evidence_digest: str = Field(
+    finding: Finding = Field(
         ...,
-        description="Updated digest: only salient facts, include concrete values (host/port/status)."
+        description="Extracted finding from probe result. Summary should be concise (1-2 sentences), structured contains key-value facts."
     )
 
 
@@ -150,7 +153,7 @@ class StopDecisionOutput(BaseModel):
     )
     reasoning: str = Field(
         ...,
-        description="2-3 sentences explaining the decision, strictly evidence-based."
+        description="CONCISE explanation (1-2 sentences, ~150 chars max) of the decision. Focus on key discriminating evidence."
     )
 
 
@@ -259,18 +262,22 @@ class Finding(BaseModel):
     """A small, human-readable piece of evidence extracted from raw probe output."""
     model_config = ConfigDict(extra="forbid")
 
-    step: int = Field(..., ge=1)
+    step: int = Field(default=0, ge=0, description="Step number assigned by orchestration layer, not LLM.")
     severity: Severity = Severity.info
-    summary: str = Field(..., min_length=1)
+    summary: str = Field(
+        ..., 
+        min_length=1,
+        description="CONCISE 1-2 sentence summary of what was discovered (~120 chars max). Focus on key facts."
+    )
 
-    # Structured anchors to support “proof”.
+    # Structured anchors to support "proof".
     references: List[str] = Field(
         default_factory=list,
         description="Pointers like 'probe:container_logs step:3' or 'file:docker-compose.yml'."
     )
     structured: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Optional structured facts (e.g., {'HOST': 'api', 'container': 'client'})."
+        description="Key-value facts extracted (e.g., {'container': 'api', 'status': 'running', 'port': 5000})."
     )
 
 
@@ -278,7 +285,11 @@ class Hypothesis(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str = Field(..., description="Stable identifier like H1, H2...")
-    statement: str = Field(..., min_length=1)
+    statement: str = Field(
+        ..., 
+        min_length=1,
+        description="Concise, single-sentence hypothesis about the root cause (~80 chars max). Put details in rationale."
+    )
     confidence: ConfidenceLevel = ConfidenceLevel.low
     rationale: Optional[str] = Field(
         default=None,
