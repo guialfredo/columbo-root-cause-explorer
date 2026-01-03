@@ -536,9 +536,16 @@ def _debug_loop_impl(
             context.probe_results_cache[probe_name] = raw_probe_result
             
             # Normalize result: wrap lists in dict for consistency
+            # Also convert ProbeResult objects to dicts for JSON serialization
             normalized_result = raw_probe_result
             if isinstance(raw_probe_result, list):
                 normalized_result = {"items": raw_probe_result}
+            elif hasattr(raw_probe_result, 'to_dict'):
+                # ProbeResult object - convert to dict
+                normalized_result = raw_probe_result.to_dict()
+            elif hasattr(raw_probe_result, 'model_dump'):
+                # Other Pydantic model - use model_dump
+                normalized_result = raw_probe_result.model_dump()
             
             # Create structured ProbeCall
             probe_call = ProbeCall(

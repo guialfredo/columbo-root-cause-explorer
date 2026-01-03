@@ -147,7 +147,14 @@ def generate_session_report(session: DebugSession) -> str:
             
             else:
                 # Generic fallback for other probe types
-                result_str = json.dumps(probe.result, indent=2)
+                # Handle Pydantic models that might not be serialized yet
+                result_to_serialize = probe.result
+                if hasattr(probe.result, 'to_dict'):
+                    result_to_serialize = probe.result.to_dict()
+                elif hasattr(probe.result, 'model_dump'):
+                    result_to_serialize = probe.result.model_dump()
+                
+                result_str = json.dumps(result_to_serialize, indent=2, default=str)
                 # Truncate if too long
                 if len(result_str) > 1000:
                     result_str = result_str[:1000] + "\n... [truncated]"
