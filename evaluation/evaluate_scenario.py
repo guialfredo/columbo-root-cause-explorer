@@ -49,9 +49,19 @@ from evaluation.metrics import (
 )
 
 
-def setup_dspy_llm(api_key: str):
-    """Configure DSPy with your LLM of choice."""
-    lm = dspy.LM("openai/gpt-5-mini", api_key=api_key, cache=False)
+def setup_dspy_llm(api_key: str, model: str = None):
+    """Configure DSPy with your LLM of choice.
+    
+    Args:
+        api_key: LLM API key
+        model: Model name (defaults to COLUMBO_MODEL env var or 'openai/gpt-5-mini')
+    """
+    if model is None:
+        model = os.getenv("COLUMBO_MODEL", "openai/gpt-5-mini")
+    
+    # gpt-5 models only support temperature=1
+    temperature = 1.0 if "gpt-5" in model else 0.0
+    lm = dspy.LM(model, api_key=api_key, cache=False, temperature=temperature)
     dspy.configure(lm=lm)
 
 
