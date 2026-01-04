@@ -8,9 +8,9 @@
 
 Columbo is an intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
 
-![Columbo Interactive UI](docs/columbo-demo-x2.mov)
+<video src="docs/columbo-demo-x6-light.mov" controls width="100%"></video>
 
-*Watch Columbo investigate in real-time with the interactive Terminal UI (2x speed)*
+*Watch Columbo investigate in real-time with the interactive Terminal UI (6x speed)*
 
 ## Overview
 
