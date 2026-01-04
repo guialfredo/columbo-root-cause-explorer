@@ -198,25 +198,11 @@ echo "COLUMBO_MODEL=anthropic/claude-3-5-sonnet-20241022" >> .env
 The easiest way to use Columbo is via the CLI:
 
 ```bash
-# Simple usage - describe the problem inline
-columbo debug "My app container fails to connect to postgres"
+# Simple usage - use columbo debug directly in your terminal
+columbo debug 
 
-# Load problem description from a file
-columbo debug --from-file problem.txt
-
-# Use interactive UI mode for live updates
-columbo debug --interactive "Service keeps crashing on startup"
-
-# Use a different LLM model via command line
-columbo debug "Network timeout" \
-  --model anthropic/claude-3-5-sonnet-20241022
-
-# Or set it via environment variable
-export COLUMBO_MODEL=anthropic/claude-3-5-sonnet-20241022
-columbo debug "Network timeout"
-
-# Save results to a specific directory
-columbo debug "Network timeout" --output-dir ./debug_results
+# Use the interactive flag to see columbo debug live 
+columbo debug --interactive
 ```
 
 After installation with `poetry install`, the `columbo` command becomes available in your environment.
