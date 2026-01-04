@@ -20,7 +20,8 @@ def setup_dspy_llm(api_key: str, seed: int = None):
         seed: Optional random seed for reproducible outputs
     """
     # For demo purposes, using OpenAI
-    kwargs = {"api_key": api_key, "cache": False, "temperature": 0.0}
+    # gpt-5 models only support temperature=1
+    kwargs = {"api_key": api_key, "cache": False, "temperature": 1.0}
     if seed is not None:
         kwargs["seed"] = seed
     lm = dspy.LM("openai/gpt-5-mini", **kwargs)
