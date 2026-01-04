@@ -280,7 +280,7 @@ Examples:
   columbo debug "Port conflict error" --workspace /path/to/project --max-steps 10
   
   # Use a different LLM model
-  columbo debug "Network timeout" --model openai/gpt-5-mini
+  columbo debug "Network timeout" --model anthropic/claude-3-5-sonnet-20241022
         """
     )
     
@@ -333,7 +333,7 @@ Examples:
         type=str,
         default="openai/gpt-5-mini",
         metavar="MODEL",
-        help="LLM model to use (default: openai/gpt-5-mini)"
+        help="LLM model to use (default: from COLUMBO_MODEL env var or 'openai/gpt-5-mini')"
     )
     
     debug_parser.add_argument(

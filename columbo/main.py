@@ -12,19 +12,24 @@ from dotenv import load_dotenv
 import os
 
 
-def setup_dspy_llm(api_key: str, seed: int = None):
+def setup_dspy_llm(api_key: str, model: str = None, seed: int = None):
     """Configure DSPy with your LLM of choice.
     
     Args:
-        api_key: OpenAI API key
+        api_key: LLM API key
+        model: Model name (e.g., 'openai/gpt-5-mini', 'anthropic/claude-3-5-sonnet-20241022')
         seed: Optional random seed for reproducible outputs
     """
-    # For demo purposes, using OpenAI
+    if model is None:
+        model = os.getenv("COLUMBO_MODEL", "openai/gpt-5-mini")
+    
     # gpt-5 models only support temperature=1
-    kwargs = {"api_key": api_key, "cache": False, "temperature": 1.0}
+    # For other models that support it, 0.0 would be more deterministic
+    temperature = 1.0 if "gpt-5" in model else 0.0
+    kwargs = {"api_key": api_key, "cache": False, "temperature": temperature}
     if seed is not None:
         kwargs["seed"] = seed
-    lm = dspy.LM("openai/gpt-5-mini", **kwargs)
+    lm = dspy.LM(model, **kwargs)
     dspy.configure(lm=lm)
 
 
@@ -48,7 +53,10 @@ if __name__ == "__main__":
     if seed:
         print(f"Using seed: {seed} for reproducible outputs")
     
-    setup_dspy_llm(api_key=openai_api_key, seed=seed)
+    model = os.getenv("COLUMBO_MODEL", "openai/gpt-5-mini")
+    print(f"Using model: {model}")
+    
+    setup_dspy_llm(api_key=openai_api_key, model=model, seed=seed)
 
     # Define the initial problem/evidence
     initial_evidence = """

@@ -156,7 +156,7 @@ docker-compose for proper container-to-container communication.
 - Python 3.11-3.14
 - Docker Desktop or Docker Engine running locally
 - Poetry for dependency management
-- OpenAI API key (or compatible LLM endpoint)
+- LLM API key (OpenAI, Anthropic, or other DSPy-compatible provider)
 
 ### Setup
 
@@ -175,6 +175,20 @@ poetry install
 ```bash
 # Create a .env file
 echo "OPENAI_API_KEY=your-api-key-here" > .env
+
+# Or for Anthropic Claude:
+echo "ANTHROPIC_API_KEY=your-api-key-here" > .env
+```
+
+4. (Optional) Set your preferred LLM model:
+```bash
+# Add to your .env file
+echo "COLUMBO_MODEL=openai/gpt-5-mini" >> .env
+
+# Or use Claude:
+echo "COLUMBO_MODEL=anthropic/claude-3-5-sonnet-20241022" >> .env
+
+# Default model if not set: openai/gpt-5-mini
 ```
 
 ## Usage
@@ -193,11 +207,13 @@ columbo debug --from-file problem.txt
 # Use interactive UI mode for live updates
 columbo debug --interactive "Service keeps crashing on startup"
 
-# Specify workspace and custom settings
-columbo debug "Port conflict error" \
-  --workspace /path/to/your/project \
-  --max-steps 10 \
-  --model openai/gpt-5-mini
+# Use a different LLM model via command line
+columbo debug "Network timeout" \
+  --model anthropic/claude-3-5-sonnet-20241022
+
+# Or set it via environment variable
+export COLUMBO_MODEL=anthropic/claude-3-5-sonnet-20241022
+columbo debug "Network timeout"
 
 # Save results to a specific directory
 columbo debug "Network timeout" --output-dir ./debug_results
@@ -210,9 +226,12 @@ After installation with `poetry install`, the `columbo` command becomes availabl
 - `--workspace PATH`: Path to your project root (default: current directory)
 - `--max-steps N`: Maximum debugging steps (default: 8)
 - `--interactive`: Enable Rich terminal UI with live updates
-- `--model MODEL`: LLM model to use (default: openai/gpt-5-mini)
+- `--model MODEL`: LLM model to use (default: from `COLUMBO_MODEL` env var or `openai/gpt-5-mini`)
 - `--output-dir PATH`: Where to save session results (default: ./columbo_sessions)
 - `--no-save`: Don't save session results to disk
+
+**Supported Models:**
+- Any DSPy-compatible LLM provider
 
 ### Interactive UI
 
