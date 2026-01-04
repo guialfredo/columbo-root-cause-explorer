@@ -5,8 +5,7 @@
 > *"Just one more thing..."* — Your investigation partner for containerized systems.
 
 </div>
-
-Columbo is an intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
+Columbo is a hypothesis-driven root cause exploration engine for containerized environments. It investigates failures by combining LLM reasoning with deterministic diagnostic probes—systematically asking the right questions, gathering evidence, and stopping only when the root cause is proven.
 
 https://github.com/user-attachments/assets/df5076ad-059b-476d-9e08-ccfcf2bff43a
 
