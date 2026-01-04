@@ -8,9 +8,9 @@
 
 Columbo is an intelligent root cause exploration engine that helps you investigate failures in containerized environments. Like the famous detective, Columbo asks the right questions and follows the evidence until the mystery is solved.
 
-![Columbo Interactive UI](docs/Screenshot%202025-12-31%20at%2015.28.54.png)
+![Columbo Interactive UI](docs/columbo-demo-x2.mov)
 
-*Watch Columbo investigate in real-time with the interactive Terminal UI*
+*Watch Columbo investigate in real-time with the interactive Terminal UI (2x speed)*
 
 ## Overview
 
@@ -285,6 +285,16 @@ Each scenario needs: `manifest.json`, `docker-compose.yml`, app code, and `READM
 See [.github/copilot-instructions.md](.github/copilot-instructions.md) for architectural principles.
 
 ## Future Enhancements
+
+### Short Term
+
+**Performance & Efficiency**  
+Token usage optimization, latency reduction, streaming responses
+
+**Scenario Coverage**  
+Timing issues (race conditions, startup ordering), resource exhaustion (OOM, disk space), multi-service failures, security issues (certificates, secrets)
+
+### Long Term
 
 **Platform Expansion**  
 Kubernetes (pods, services, ConfigMaps), Docker Swarm (tasks, overlay networks), Podman (rootless containers, SELinux)
