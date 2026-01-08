@@ -55,6 +55,7 @@ The RAG agent is configured via `docker-compose.yml` to connect to Qdrant using 
 ## How to Run
 ```bash
 cd scenarios/s001_env_override
+cp .env.example .env  # Create .env from template
 docker-compose up --build
 ```
 

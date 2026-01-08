@@ -3,6 +3,9 @@
 .env.local
 .env.*.local
 
+# Exception: scenario .env files are test data, not secrets
+!scenarios/**/.env
+
 # Python cache files
 __pycache__/
 *.py[cod]
